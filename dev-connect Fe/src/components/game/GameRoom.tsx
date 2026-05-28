@@ -6,6 +6,16 @@ import {
 import { GuessTheNumber } from './GuessTheNumber';
 import { PartyRoom } from './PartyRoom';
 import { DiceGame } from './DiceGame';
+import { Phase10 } from './Phase10';
+
+// Proper "playing cards" glyph for Phase 10 (two fanned cards with a 10 pip).
+const Phase10Icon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round" {...props}>
+    <rect x="3" y="7" width="10" height="14" rx="2" transform="rotate(-15 8 14)" fill="currentColor" fillOpacity="0.12" />
+    <rect x="11" y="4.5" width="10" height="14" rx="2" fill="currentColor" fillOpacity="0.18" />
+    <text x="16" y="14.2" textAnchor="middle" fontSize="6.5" fontWeight="800" fill="currentColor" stroke="none">10</text>
+  </svg>
+);
 
 // ── Game Card type ──
 interface GameCard {
@@ -29,6 +39,20 @@ interface Category {
 }
 
 const CATEGORIES: Category[] = [
+  {
+    title: 'Card Games',
+    emoji: '🃏',
+    description: 'Classic card games to play with friends',
+    games: [
+      {
+        id: 'phase10', name: 'Phase 10',
+        description: 'Race through 10 phases — sets, runs & wilds. Rummy meets UNO!',
+        icon: <Phase10Icon className="w-5 h-5" />, players: '2-6',
+        gradient: 'from-fuchsia-500 to-purple-600', bgGlow: 'shadow-fuchsia-500/20',
+        type: 'standalone',
+      },
+    ],
+  },
   {
     title: 'Guessing & Strategy',
     emoji: '🎯',
@@ -190,6 +214,9 @@ export const GameRoom = ({ currentUser, joinInvite, onInviteConsumed }: { curren
 
   if (activeGame === 'guess_1v1') {
     return <GuessTheNumber currentUser={currentUser} onBack={exitGame} initialRoomId={inviteRoomId} />;
+  }
+  if (activeGame === 'phase10') {
+    return <Phase10 currentUser={currentUser} onBack={exitGame} initialRoomId={inviteRoomId} />;
   }
   if (activeGame === 'party') {
     return <PartyRoom currentUser={currentUser} onBack={exitGame} initialGameType={activePartyKey} initialRoomId={inviteRoomId} />;

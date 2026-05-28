@@ -193,6 +193,52 @@ export function partyRematch(roomId: string) {
   stompPublish(`/app/party/rematch/${roomId}`);
 }
 
+// --- Phase 10 ---
+
+export function phase10Join(roomId: string) {
+  stompPublish(`/app/phase10/join/${roomId}`);
+}
+
+export function phase10Leave(roomId: string) {
+  stompPublish(`/app/phase10/leave/${roomId}`);
+}
+
+export function phase10Start(roomId: string) {
+  stompPublish(`/app/phase10/start/${roomId}`);
+}
+
+export function phase10AddBot(roomId: string) {
+  stompPublish(`/app/phase10/add-bot/${roomId}`);
+}
+
+export function phase10RemoveBot(roomId: string, botName: string) {
+  stompPublish('/app/phase10/remove-bot', JSON.stringify({ roomId, botName }));
+}
+
+export function phase10Rematch(roomId: string) {
+  stompPublish(`/app/phase10/rematch/${roomId}`);
+}
+
+export function phase10Draw(roomId: string, fromDiscard: boolean) {
+  stompPublish('/app/phase10/draw', JSON.stringify({ roomId, fromDiscard }));
+}
+
+export function phase10Lay(roomId: string, groups: string[][]) {
+  stompPublish('/app/phase10/lay', JSON.stringify({ roomId, groups }));
+}
+
+export function phase10Hit(roomId: string, meldId: string, cardId: string, runEnd?: 'LOW' | 'HIGH') {
+  stompPublish('/app/phase10/hit', JSON.stringify({ roomId, meldId, cardId, runEnd }));
+}
+
+export function phase10Discard(roomId: string, discardCardId: string, skipTarget?: string) {
+  stompPublish('/app/phase10/discard', JSON.stringify({ roomId, discardCardId, skipTarget }));
+}
+
+export function phase10Chat(roomId: string, message: string) {
+  stompPublish('/app/phase10/chat', JSON.stringify({ roomId, message }));
+}
+
 // --- WebRTC Signaling ---
 
 export function sendSignal(signal: any) {

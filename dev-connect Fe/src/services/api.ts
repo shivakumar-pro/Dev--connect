@@ -70,6 +70,16 @@ export const DiceAPI = {
   action: (id: string, data: any) => api.post(`/dice/rooms/${id}/action`, data).then(r => r.data),
 };
 
+export const Phase10API = {
+  createRoom: (data: { maxPlayers?: number; turnTimerSeconds?: number; botsEnabled?: boolean }) =>
+    api.post('/phase10/create-room', data).then(res => res.data),
+  listRooms: () => api.get('/phase10/rooms').then(res => res.data),
+  getRoom: (roomId: string) => api.get(`/phase10/room/${roomId}`).then(res => res.data),
+  getPhases: () => api.get('/phase10/phases').then(res => res.data),
+  getLeaderboard: () => api.get('/phase10/leaderboard').then(res => res.data),
+  getStats: (username: string) => api.get(`/phase10/stats/${username}`).then(res => res.data),
+};
+
 export const GameAPI = {
   createRoom: (difficulty?: string) =>
     api.post('/game/create-room', difficulty ? { difficulty } : {}).then(res => res.data),
