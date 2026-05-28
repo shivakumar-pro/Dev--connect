@@ -19,6 +19,8 @@ export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead, onJoinGameI
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [search, setSearch] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Chat request & block state
   const [chatStatus, setChatStatus] = useState<ChatStatus>('loading');
@@ -30,7 +32,8 @@ export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead, onJoinGameI
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; message: any } | null>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const c = scrollRef.current;
+    if (c) c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
   // Load users
@@ -186,6 +189,7 @@ export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead, onJoinGameI
         senderId: currentUser.id, senderName: currentUser.username,
       }]);
       setMsgInput('');
+      inputRef.current?.focus();
     } catch (err) {
       console.error('Failed to send', err);
     }
@@ -389,15 +393,16 @@ export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead, onJoinGameI
     return (
       <div className="fixed bottom-16 left-0 right-0 lg:static lg:bottom-0 p-3 sm:p-6 bg-bg-secondary border-t border-border-color z-30 shrink-0">
         <form className="flex items-center gap-2 sm:gap-3 max-w-6xl mx-auto" onSubmit={handleSend}>
-          <EmojiPicker onSelect={(e) => setMsgInput((v) => v + e)} />
+          <EmojiPicker onSelect={(e) => { setMsgInput((v) => v + e); inputRef.current?.focus(); }} />
           <input
+            ref={inputRef}
             type="text"
             className="flex-1 min-w-0 h-11 sm:h-14 bg-bg-tertiary border border-border-color focus:border-accent-purple rounded-full px-4 sm:px-6 text-sm sm:text-base focus:outline-none focus:ring-1 focus:ring-accent-purple/30 text-text-primary placeholder:text-text-muted transition-all"
             placeholder={`Message @${activeUser?.username}...`}
             value={msgInput}
             onChange={(e) => setMsgInput(e.target.value)}
           />
-          <Button type="submit" variant="primary" size="icon" className="rounded-full shrink-0 w-11 h-11 sm:w-14 sm:h-14 shadow-lg bg-gradient-to-br from-accent-purple to-accent-hover" disabled={!msgInput.trim()}>
+          <Button type="submit" variant="primary" size="icon" onMouseDown={(e) => e.preventDefault()} className="rounded-full shrink-0 w-11 h-11 sm:w-14 sm:h-14 shadow-lg bg-gradient-to-br from-accent-purple to-accent-hover" disabled={!msgInput.trim()}>
             <Send className="w-4 h-4 sm:w-5 sm:h-5 ml-0.5" />
           </Button>
         </form>
@@ -576,7 +581,7 @@ export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead, onJoinGameI
             </header>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-8 flex flex-col gap-3">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 lg:p-8 pb-36 lg:pb-8 flex flex-col gap-3">
               <div className="flex-1" />
               {chatStatus === 'loading' || isLoadingChats ? (
                 <div className="flex justify-center items-center h-full">

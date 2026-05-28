@@ -33,6 +33,7 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
   const [isLoadingChats, setIsLoadingChats] = useState(false);
   const [isLoadingGroups, setIsLoadingGroups] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Create modal
@@ -54,7 +55,7 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
   const [addMemberInput, setAddMemberInput] = useState('');
   const [error, setError] = useState('');
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => { const c = scrollRef.current; if (c) c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' }); }, [messages]);
 
   // Load groups
   useEffect(() => {
@@ -141,6 +142,7 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
     sendGroupMessage(activeGroup.id, msgInput);
     setMessages(p => [...p, { id: Date.now(), content: msgInput, senderId: currentUser.id, senderName: currentUser.username, createdAt: new Date().toISOString() }]);
     setMsgInput('');
+    inputRef.current?.focus();
   };
 
   const insertEmoji = (emoji: string) => {
@@ -323,7 +325,7 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
             <div className="flex flex-1 overflow-hidden">
               {/* Messages */}
               <div className="flex-1 flex flex-col min-w-0">
-                <div className="flex-1 overflow-y-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 lg:pb-6 flex flex-col">
+                <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-36 lg:pb-6 flex flex-col">
                   {isLoadingChats ? (
                     <div className="flex flex-col justify-center items-center h-full gap-3 text-text-muted">
                       <Loader2 className="w-8 h-8 animate-spin text-accent-orange" />
@@ -411,7 +413,7 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
                     <input ref={inputRef} type="text"
                       className="flex-1 min-w-0 h-11 sm:h-12 bg-bg-tertiary border border-border-color focus:border-accent-orange rounded-full px-4 sm:px-5 text-sm sm:text-base focus:outline-none focus:ring-1 focus:ring-accent-orange/30 text-text-primary placeholder:text-text-muted transition-all"
                       placeholder={`Message #${activeGroup.name}…`} value={msgInput} onChange={e => setMsgInput(e.target.value)} />
-                    <button type="submit" disabled={!msgInput.trim()}
+                    <button type="submit" disabled={!msgInput.trim()} onMouseDown={(e) => e.preventDefault()}
                       className="shrink-0 w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center bg-gradient-to-br from-accent-orange to-red-500 text-white shadow-lg hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
                       aria-label="Send">
                       <Send className="w-5 h-5" />

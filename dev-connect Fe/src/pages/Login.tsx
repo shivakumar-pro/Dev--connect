@@ -49,7 +49,7 @@ export const Login = () => {
           token: accessToken,
         })
       );
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     } catch (error: any) {
       setErrorMsg(error?.response?.data?.message || 'Login failed. Please verify credentials.');
     } finally {

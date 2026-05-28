@@ -33,6 +33,7 @@ export const GlobalChat = ({ currentUser, onMarkRead }: { currentUser?: any; unr
   const [isLoading, setIsLoading] = useState(true);
   const [isSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const currentUsername = currentUser?.username || 'me';
@@ -94,7 +95,8 @@ export const GlobalChat = ({ currentUser, onMarkRead }: { currentUser?: any; unr
 
   // Auto-scroll on new message
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const c = scrollRef.current;
+    if (c) c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
   const handleSend = async (e: React.FormEvent) => {
@@ -112,6 +114,7 @@ export const GlobalChat = ({ currentUser, onMarkRead }: { currentUser?: any; unr
         isOwn: true,
       }]);
       setInputValue('');
+      inputRef.current?.focus();
     } catch (err) {
       console.error('Failed to send message', err);
     }
@@ -145,7 +148,7 @@ export const GlobalChat = ({ currentUser, onMarkRead }: { currentUser?: any; unr
       </header>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 lg:pb-6 flex flex-col">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-36 lg:pb-6 flex flex-col">
         {isLoading ? (
           <div className="flex flex-col justify-center items-center h-full gap-3 text-text-muted">
             <Loader2 className="w-8 h-8 animate-spin text-accent-purple" />
@@ -242,6 +245,7 @@ export const GlobalChat = ({ currentUser, onMarkRead }: { currentUser?: any; unr
           <button
             type="submit"
             disabled={!inputValue.trim() || isSending}
+            onMouseDown={(e) => e.preventDefault()}
             className="shrink-0 w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center bg-gradient-to-br from-accent-orange to-red-500 text-white shadow-lg hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
             aria-label="Send"
           >
