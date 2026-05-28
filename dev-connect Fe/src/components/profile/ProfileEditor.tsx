@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Check, Loader2, AlertCircle } from 'lucide-react';
+import { X, Check, Loader2, AlertCircle, Palette } from 'lucide-react';
 import { Button } from '../common/Button';
+import { ThemeSwitcher } from '../common/ThemeSwitcher';
 import { UserAPI } from '../../services/api';
 import { AVATAR_CATALOG, getAvatarEmoji } from '../../utils/avatars';
 import type { AvatarOption } from '../../utils/avatars';
@@ -20,7 +21,7 @@ export const ProfileEditor = ({ currentUser, onClose, onUpdate }: ProfileEditorP
   const [emailStatus, setEmailStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     UserAPI.getAvatars().then(res => {
@@ -110,7 +111,7 @@ export const ProfileEditor = ({ currentUser, onClose, onUpdate }: ProfileEditorP
       <div className="bg-bg-secondary border border-border-color rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border-color sticky top-0 bg-bg-secondary z-10">
-          <h2 className="text-lg font-bold text-text-primary">Edit Profile</h2>
+          <h2 className="text-lg font-bold text-text-primary">Settings</h2>
           <button onClick={onClose} className="p-1.5 hover:bg-bg-tertiary rounded-lg text-text-muted"><X className="w-5 h-5" /></button>
         </div>
 
@@ -178,6 +179,15 @@ export const ProfileEditor = ({ currentUser, onClose, onUpdate }: ProfileEditorP
             </div>
             {emailStatus === 'taken' && <p className="text-xs text-red-400 mt-1">Email already taken</p>}
             {emailStatus === 'available' && <p className="text-xs text-green-500 mt-1">Available!</p>}
+          </div>
+
+          {/* Theme / Appearance */}
+          <div className="pt-2 border-t border-border-color">
+            <label className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Palette className="w-3.5 h-3.5" /> Appearance
+            </label>
+            <ThemeSwitcher />
+            <p className="text-xs text-text-muted mt-2">Pick your theme — saved automatically and applied everywhere.</p>
           </div>
 
           {error && (

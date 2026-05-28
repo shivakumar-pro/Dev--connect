@@ -17,7 +17,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 function App() {
   return (
     <BrowserRouter>
-      <div className="w-[100vw] h-[100vh] bg-bg-primary text-text-primary overflow-hidden font-sans">
+      <div className="min-h-screen w-full bg-bg-primary text-text-primary font-sans">
+        {/* DevConnect-theme floating colorful orbs (CSS shows only for that theme) */}
+        <div className="dc-orbs" aria-hidden="true" />
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Landing />} />

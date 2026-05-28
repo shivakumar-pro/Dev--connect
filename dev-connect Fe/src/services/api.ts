@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://10.0.3.187:8080/api';
+const API_URL = import.meta.env.VITE_API_URL;
 
 export const api = axios.create({
   baseURL: API_URL,

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, X } from 'lucide-react';
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff } from 'lucide-react';
 import {
   startCall,
   handleSignal,

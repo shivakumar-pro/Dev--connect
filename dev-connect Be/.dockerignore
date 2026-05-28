@@ -1,0 +1,15 @@
+target
+.idea
+.vscode
+*.iml
+.git
+.gitignore
+.env
+.mvn/wrapper/maven-wrapper.jar
+node_modules
+Dockerfile
+.dockerignore
+README.md
+
+# Agent Monitor
+.agent/

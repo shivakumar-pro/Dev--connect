@@ -3,7 +3,7 @@ import type { IMessage, StompSubscription } from '@stomp/stompjs';
 // @ts-ignore
 import SockJS from 'sockjs-client';
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'http://10.0.3.187:8080/ws';
+const WS_URL = import.meta.env.VITE_WS_URL;
 
 let stompClient: Client | null = null;
 let connected = false;

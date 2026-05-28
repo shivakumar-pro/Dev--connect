@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Copy, CheckCircle, Users, Crown, Play, Dices, Loader2, RotateCcw, Hand, Trophy } from 'lucide-react';
+import { ArrowLeft, Copy, CheckCircle, Users, Crown, Play, Loader2, RotateCcw, Trophy } from 'lucide-react';
 import { Button } from '../common/Button';
 import { DiceAPI } from '../../services/api';
 import { getAvatarEmoji } from '../../utils/avatars';
+import { GameInviteButton } from './GameInviteButton';
 
 type Phase = 'lobby' | 'waiting' | 'playing' | 'gameover';
 type DiceGameType = 'PIG' | 'FARKLE' | 'LIARS_DICE' | 'SHIP_CAPTAIN_CREW';
 
 const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-const DICE_3D = ['🎲', '🎲', '🎲', '🎲', '🎲', '🎲'];
 const RANDOM_FACE = () => DICE_FACES[Math.floor(Math.random() * 6)];
 
 const GAME_INFO: Record<DiceGameType, { name: string; desc: string; color: string; target: number; emoji: string }> = {
@@ -18,9 +18,9 @@ const GAME_INFO: Record<DiceGameType, { name: string; desc: string; color: strin
   SHIP_CAPTAIN_CREW: { name: 'Ship Captain Crew',  desc: 'Lock 6-5-4, then score your cargo!',                 color: 'from-blue-500 to-indigo-600',   target: 0,     emoji: '⛵' },
 };
 
-interface DiceGameProps { currentUser: any; onBack: () => void; gameType: DiceGameType }
+interface DiceGameProps { currentUser: any; onBack: () => void; gameType: DiceGameType; initialRoomId?: string }
 
-export const DiceGame = ({ currentUser, onBack, gameType }: DiceGameProps) => {
+export const DiceGame = ({ currentUser, onBack, gameType, initialRoomId }: DiceGameProps) => {
   const username = currentUser?.username || '';
   const info = GAME_INFO[gameType];
 
@@ -28,7 +28,7 @@ export const DiceGame = ({ currentUser, onBack, gameType }: DiceGameProps) => {
   const [roomId, setRoomId] = useState('');
   const [roomInput, setRoomInput] = useState('');
   const [state, setState] = useState<any>(null);
-  const [result, setResult] = useState<any>(null);
+  const [, setResult] = useState<any>(null);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -95,6 +95,12 @@ export const DiceGame = ({ currentUser, onBack, gameType }: DiceGameProps) => {
       await refreshState(id);
     } catch (err: any) { showError(err?.response?.data?.message || 'Failed to join'); }
   };
+
+  // Auto-join when arriving via a chat invite
+  useEffect(() => {
+    if (initialRoomId) handleJoin(initialRoomId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialRoomId]);
 
   const handleStart = async () => {
     try {
@@ -284,12 +290,14 @@ export const DiceGame = ({ currentUser, onBack, gameType }: DiceGameProps) => {
               <span className="font-mono font-bold text-sm text-white">{roomId}</span>
               {copied ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-slate-500" />}
             </button>
+
+            <GameInviteButton currentUser={currentUser} kind="dice" diceType={gameType} roomId={roomId} label={info.name} />
             <div className="w-full bg-[#131C2E] border border-white/[0.06] rounded-2xl overflow-hidden">
               <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Players ({players.length})</span>
                 <Users className="w-4 h-4 text-slate-600" />
               </div>
-              {players.map((p: any, i: number) => (
+              {players.map((p: any) => (
                 <div key={p.username} className="flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.03] last:border-0">
                   <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center text-xl">
                     {getAvatarEmoji(p.profileAvatar)}

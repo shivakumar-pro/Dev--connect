@@ -1,11 +1,29 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Users, Plus, Hash, Info, Send, Loader2, X, Search, Check, Crown, Shield, UserMinus, UserPlus, LogOut, Trash2, Edit3, ChevronUp, ChevronDown, ArrowLeft } from 'lucide-react';
+import { EmojiPicker } from '../common/EmojiPicker';
 import { Button } from '../common/Button';
 import { GroupAPI, MessageAPI, UserAPI } from '../../services/api';
 import { subscribe, sendGroupMessage } from '../../services/stompClient';
 import { getAvatarEmoji } from '../../utils/avatars';
 
 interface Member { userId: number; username: string; profileAvatar?: string; role: string; joinedAt?: string }
+
+const dayLabel = (raw: any) => {
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return '';
+  const today = new Date();
+  const yest = new Date();
+  yest.setDate(today.getDate() - 1);
+  const same = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+  if (same(d, today)) return 'Today';
+  if (same(d, yest)) return 'Yesterday';
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const timeLabel = (raw: any) => {
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
 
 export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUser: any; unreadCounts?: Record<string, number>; onMarkRead?: (roomId: string) => void }) => {
   const [groups, setGroups] = useState<any[]>([]);
@@ -15,6 +33,7 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
   const [isLoadingChats, setIsLoadingChats] = useState(false);
   const [isLoadingGroups, setIsLoadingGroups] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Create modal
   const [showCreate, setShowCreate] = useState(false);
@@ -55,7 +74,6 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
   // Load messages
   useEffect(() => {
     if (!activeGroup) return;
-    // Mark as read
     onMarkRead?.(`group-${activeGroup.id}`);
     setIsLoadingChats(true);
     MessageAPI.getGroup(activeGroup.id, 50).then(res => {
@@ -73,6 +91,8 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
     let sub: any = null;
     subscribe(`/topic/group/${activeGroup.id}`, (msg: any) => {
       if (cancelled) return;
+      // Ignore typed events / contentless payloads (prevents phantom empty bubbles)
+      if (msg.type || !msg.content) return;
       if (msg.senderId === currentUser?.id || msg.senderName === currentUser?.username) return;
       setMessages(prev => [...prev, msg]);
     }).then(s => { sub = s; });
@@ -121,6 +141,11 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
     sendGroupMessage(activeGroup.id, msgInput);
     setMessages(p => [...p, { id: Date.now(), content: msgInput, senderId: currentUser.id, senderName: currentUser.username, createdAt: new Date().toISOString() }]);
     setMsgInput('');
+  };
+
+  const insertEmoji = (emoji: string) => {
+    setMsgInput(v => v + emoji);
+    inputRef.current?.focus();
   };
 
   const handleCreateGroup = async () => {
@@ -209,117 +234,195 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
   return (
     <div className="flex h-full w-full bg-bg-primary overflow-hidden relative">
 
-      {/* Groups Sidebar — hidden on mobile when a group is selected */}
-      <div className={`${activeGroup ? 'hidden lg:flex' : 'flex'} w-full lg:w-96 border-r border-border-color bg-bg-secondary flex-col shrink-0 lg:flex-none`}>
-        <div className="p-6 border-b border-border-color flex justify-between items-center">
-          <h2 className="text-2xl font-bold flex items-center gap-3">
-            <Users className="w-6 h-6 text-accent-orange" /> Groups
+      {/* Groups Sidebar */}
+      <div className={`${activeGroup ? 'hidden lg:flex' : 'flex'} w-full lg:w-80 xl:w-96 border-r border-border-color bg-bg-secondary flex-col shrink-0`}>
+        <div className="h-16 sm:h-20 px-4 sm:px-6 border-b border-border-color flex justify-between items-center shrink-0">
+          <h2 className="text-lg sm:text-2xl font-bold flex items-center gap-2.5">
+            <Users className="w-5 h-5 sm:w-6 sm:h-6 text-accent-orange" /> Groups
           </h2>
           <button onClick={() => setShowCreate(true)}
-            className="w-10 h-10 rounded-xl bg-accent-orange/10 text-accent-orange hover:bg-accent-orange hover:text-white flex items-center justify-center transition-colors border border-accent-orange/20">
-            <Plus className="w-6 h-6" />
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-accent-orange/10 text-accent-orange hover:bg-accent-orange hover:text-white flex items-center justify-center transition-colors border border-accent-orange/20"
+            title="Create group">
+            <Plus className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
-        <div className="p-4 flex-1 overflow-y-auto">
-          <div className="text-sm font-bold text-text-muted uppercase tracking-wider mb-4 ml-2">Your Channels</div>
+
+        <div className="flex-1 overflow-y-auto p-3">
+          <div className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2 px-3 pt-2">Your channels</div>
           {isLoadingGroups ? (
-            <div className="flex justify-center p-4"><Loader2 className="w-6 h-6 animate-spin text-accent-orange" /></div>
+            <div className="flex justify-center p-6"><Loader2 className="w-6 h-6 animate-spin text-accent-orange" /></div>
           ) : groups.length === 0 ? (
-            <div className="p-4 text-center text-text-muted">No groups yet. Click + to create!</div>
-          ) : groups.map(g => (
-            <div key={g.id} onClick={() => { setActiveGroup(g); setShowInfo(false); }}
-              className={`flex items-center justify-between p-4 rounded-xl cursor-pointer transition-colors mb-1 ${
-                activeGroup?.id === g.id ? 'bg-accent-orange/15 text-accent-orange font-semibold border border-accent-orange/20' : 'text-text-secondary hover:bg-bg-tertiary hover:text-text-primary border border-transparent'
-              }`}>
-              <div className="flex items-center gap-3 truncate text-lg">
-                <Hash className="w-5 h-5 shrink-0 opacity-70" />
-                <span className="truncate">{g.name}</span>
+            <div className="flex flex-col items-center text-center px-4 py-12">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent-orange/20 to-red-500/10 border border-accent-orange/20 flex items-center justify-center mb-4">
+                <Users className="w-8 h-8 text-accent-orange" />
               </div>
-              {(unreadCounts?.[`group-${g.id}`] || 0) > 0 ? (
-                <span className="min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center shrink-0">
-                  {(unreadCounts?.[`group-${g.id}`] || 0) > 99 ? '99+' : unreadCounts?.[`group-${g.id}`]}
-                </span>
-              ) : g.memberCount ? (
-                <span className="text-xs text-text-muted">{g.memberCount}</span>
-              ) : null}
+              <h3 className="font-semibold text-text-primary mb-1">No groups yet</h3>
+              <p className="text-sm text-text-secondary mb-4">Create a channel to start collaborating with your team.</p>
+              <Button variant="primary" size="sm" onClick={() => setShowCreate(true)} className="gap-2 bg-gradient-to-r from-accent-orange to-red-500 border-0">
+                <Plus className="w-4 h-4" /> Create group
+              </Button>
             </div>
-          ))}
+          ) : (
+            <div className="flex flex-col gap-1">
+              {groups.map(g => {
+                const unread = unreadCounts?.[`group-${g.id}`] || 0;
+                const active = activeGroup?.id === g.id;
+                return (
+                  <button key={g.id} onClick={() => { setActiveGroup(g); setShowInfo(false); }}
+                    className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-colors text-left w-full ${
+                      active ? 'bg-accent-orange/15 border border-accent-orange/20' : 'hover:bg-bg-tertiary border border-transparent'
+                    }`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0 font-bold text-base bg-gradient-to-br ${
+                      active ? 'from-accent-orange to-red-500' : 'from-bg-tertiary to-bg-tertiary border border-border-color !text-text-muted'
+                    }`}>
+                      {(g.name || '#').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className={`font-semibold text-sm truncate ${active ? 'text-accent-orange' : 'text-text-primary'}`}>{g.name}</div>
+                      <div className="text-xs text-text-muted truncate">
+                        {g.memberCount ? `${g.memberCount} member${g.memberCount === 1 ? '' : 's'}` : (g.description || 'Group channel')}
+                      </div>
+                    </div>
+                    {unread > 0 && (
+                      <span className="min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center shrink-0">
+                        {unread > 99 ? '99+' : unread}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Main Chat Area */}
-      <div className={`${activeGroup ? 'flex' : 'hidden lg:flex'} flex-col flex-1 bg-bg-primary h-full`}>
+      <div className={`${activeGroup ? 'flex' : 'hidden lg:flex'} flex-col flex-1 bg-bg-primary h-full min-w-0`}>
         {activeGroup ? (
           <>
-            <header className="h-16 lg:h-20 px-3 lg:px-8 border-b border-border-color flex items-center justify-between shrink-0 glass w-full">
-              <div className="flex items-center gap-3">
-                <button onClick={() => setActiveGroup(null)} className="lg:hidden p-1.5 -ml-1 hover:bg-bg-tertiary rounded-lg text-text-secondary">
+            <header className="h-16 sm:h-20 px-3 sm:px-6 lg:px-8 border-b border-border-color flex items-center justify-between shrink-0 glass w-full">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <button onClick={() => setActiveGroup(null)} className="lg:hidden p-1.5 -ml-1 hover:bg-bg-tertiary rounded-lg text-text-secondary shrink-0">
                   <ArrowLeft className="w-5 h-5" />
                 </button>
-                <div className="flex flex-col justify-center">
-                  <h2 className="font-bold text-base lg:text-xl flex items-center gap-2">
-                    <Hash className="w-5 h-5 lg:w-6 lg:h-6 text-text-muted" /> {activeGroup.name}
+                <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-accent-orange to-red-500 flex items-center justify-center text-white font-bold shrink-0">
+                  {(activeGroup.name || '#').charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <h2 className="font-bold text-base sm:text-xl leading-tight truncate flex items-center gap-1.5">
+                    <Hash className="w-4 h-4 text-text-muted shrink-0" />{activeGroup.name}
                   </h2>
-                  <p className="text-sm text-text-secondary mt-1">{activeGroup.description || 'DevConnect Group'}</p>
+                  <p className="text-xs sm:text-sm text-text-secondary truncate">{activeGroup.description || 'DevConnect group'}</p>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="gap-2 h-10 px-4" onClick={() => setShowInfo(!showInfo)}>
-                <Info className="w-5 h-5" /> {showInfo ? 'Close' : 'Info'}
+              <Button variant={showInfo ? 'primary' : 'secondary'} size="sm" className={`gap-2 shrink-0 ${showInfo ? 'bg-accent-orange border-0' : ''}`} onClick={() => setShowInfo(!showInfo)}>
+                <Info className="w-4 h-4" /> <span className="hidden sm:inline">{showInfo ? 'Close' : 'Info'}</span>
               </Button>
             </header>
 
             <div className="flex flex-1 overflow-hidden">
               {/* Messages */}
-              <div className="flex-1 flex flex-col">
-                <div className="flex-1 overflow-y-auto p-8 flex flex-col gap-6">
-                  <div className="flex-1" />
+              <div className="flex-1 flex flex-col min-w-0">
+                <div className="flex-1 overflow-y-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 lg:pb-6 flex flex-col">
                   {isLoadingChats ? (
-                    <div className="flex justify-center items-center h-full"><Loader2 className="w-8 h-8 animate-spin text-accent-purple" /></div>
-                  ) : messages.length === 0 ? (
-                    <div className="flex justify-center flex-col gap-4 items-center h-full text-text-muted text-lg">
-                      <Users className="w-16 h-16 opacity-30" />
-                      Be the first to speak in #{activeGroup.name}!
+                    <div className="flex flex-col justify-center items-center h-full gap-3 text-text-muted">
+                      <Loader2 className="w-8 h-8 animate-spin text-accent-orange" />
+                      <span className="text-sm">Loading messages…</span>
                     </div>
-                  ) : messages.map((m, i) => {
-                    const isOwn = m.senderId === currentUser?.id || m.senderName === currentUser?.username;
-                    return (
-                      <div key={i} className={`flex gap-4 max-w-[85%] items-start ${isOwn ? 'self-end flex-row-reverse' : ''}`}>
-                        {!isOwn && (
-                          <div className="w-10 h-10 rounded-xl bg-bg-tertiary border border-border-color flex items-center justify-center text-xl shrink-0 mt-1">
-                            {getAvatarEmoji(m.profileAvatar)}
-                          </div>
-                        )}
-                        <div className={`flex flex-col ${isOwn ? 'items-end' : ''}`}>
-                          {!isOwn && <span className="font-semibold text-sm text-orange-400 mb-1 ml-1">{m.senderName || `User ${m.senderId}`}</span>}
-                          <div className={`px-5 py-3.5 rounded-3xl text-base ${isOwn ? 'bg-gradient-to-br from-accent-orange to-red-500 text-white shadow-md rounded-tr-sm' : 'bg-bg-tertiary border border-border-color text-text-primary rounded-tl-sm'}`}>
-                            {m.content}
-                          </div>
-                          {(m.createdAt || m.timestamp) && (
-                            <span className="text-[10px] text-text-muted mt-0.5 mx-1">
-                              {new Date(m.createdAt || m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          )}
-                        </div>
+                  ) : messages.length === 0 ? (
+                    <div className="flex flex-col justify-center items-center h-full text-center px-6">
+                      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-accent-orange/20 to-red-500/10 border border-accent-orange/20 flex items-center justify-center mb-5">
+                        <Hash className="w-10 h-10 text-accent-orange" />
                       </div>
-                    );
-                  })}
+                      <h3 className="text-lg font-semibold text-text-primary mb-1.5">Welcome to #{activeGroup.name}</h3>
+                      <p className="text-sm text-text-secondary max-w-sm leading-relaxed">
+                        This is the beginning of the group. Be the first to say something!
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex-1" />
+                      <div className="flex flex-col gap-1.5">
+                        {messages.map((m, i) => {
+                          const isOwn = m.senderId === currentUser?.id || m.senderName === currentUser?.username;
+                          const prev = messages[i - 1];
+                          const stamp = m.createdAt || m.timestamp;
+                          const prevStamp = prev?.createdAt || prev?.timestamp;
+                          const newDay = i === 0 || dayLabel(prevStamp) !== dayLabel(stamp);
+                          const prevOwn = prev && (prev.senderId === currentUser?.id || prev.senderName === currentUser?.username);
+                          const grouped = !newDay && prev && prev.senderName === m.senderName && prevOwn === isOwn;
+                          const showHeader = !grouped;
+
+                          return (
+                            <React.Fragment key={m.id || i}>
+                              {newDay && stamp && (
+                                <div className="flex items-center gap-3 my-4">
+                                  <div className="flex-1 h-px bg-border-color" />
+                                  <span className="text-[11px] font-medium text-text-muted px-2 py-0.5 rounded-full bg-bg-secondary border border-border-color">
+                                    {dayLabel(stamp)}
+                                  </span>
+                                  <div className="flex-1 h-px bg-border-color" />
+                                </div>
+                              )}
+
+                              <div className={`group flex gap-2.5 sm:gap-3 max-w-[88%] sm:max-w-[75%] ${isOwn ? 'ml-auto flex-row-reverse' : ''} ${showHeader ? 'mt-2' : ''}`}>
+                                {!isOwn && (
+                                  showHeader ? (
+                                    <div className="w-9 h-9 rounded-full bg-bg-tertiary border border-border-color shrink-0 flex items-center justify-center text-base">
+                                      {getAvatarEmoji(m.profileAvatar)}
+                                    </div>
+                                  ) : <div className="w-9 shrink-0" />
+                                )}
+
+                                <div className={`flex flex-col min-w-0 ${isOwn ? 'items-end' : 'items-start'}`}>
+                                  {showHeader && !isOwn && (
+                                    <span className="text-xs font-medium text-accent-orange mb-1 ml-1">{m.senderName || `User ${m.senderId}`}</span>
+                                  )}
+                                  <div className="flex items-end gap-2">
+                                    {isOwn && stamp && (
+                                      <span className="text-[10px] text-text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0">{timeLabel(stamp)}</span>
+                                    )}
+                                    <div className={`px-4 py-2.5 rounded-2xl shadow-sm break-words ${
+                                      isOwn
+                                        ? 'bg-gradient-to-br from-accent-orange to-red-500 text-white rounded-br-md'
+                                        : 'bg-bg-tertiary text-text-primary border border-border-color rounded-bl-md'
+                                    }`}>
+                                      <p className="text-sm sm:text-[15px] leading-relaxed whitespace-pre-wrap">{m.content}</p>
+                                    </div>
+                                    {!isOwn && stamp && (
+                                      <span className="text-[10px] text-text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0">{timeLabel(stamp)}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </React.Fragment>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                   <div ref={messagesEndRef} />
                 </div>
 
-                <div className="fixed bottom-14 left-0 right-0 lg:static p-3 sm:p-6 bg-bg-secondary border-t border-border-color z-30 shrink-0">
-                  <form className="flex items-center gap-4 max-w-6xl mx-auto" onSubmit={handleSend}>
-                    <input type="text" className="flex-1 h-14 bg-bg-tertiary border border-border-color focus:border-accent-orange rounded-full px-6 text-base focus:outline-none text-text-primary placeholder:text-text-muted shadow-inner"
-                      placeholder={`Message #${activeGroup.name}...`} value={msgInput} onChange={e => setMsgInput(e.target.value)} />
-                    <Button type="submit" variant="primary" size="icon" className="bg-gradient-to-br from-accent-orange to-red-500 w-14 h-14 shadow-lg shrink-0 rounded-full" disabled={!msgInput.trim()}>
-                      <Send className="w-5 h-5 ml-1" />
-                    </Button>
+                {/* Input */}
+                <div className="fixed bottom-16 left-0 right-0 lg:static lg:bottom-0 p-3 sm:p-4 lg:p-6 bg-bg-secondary border-t border-border-color z-30 shrink-0">
+                  <form className="flex items-center gap-2 sm:gap-3 max-w-4xl mx-auto" onSubmit={handleSend}>
+                    <EmojiPicker onSelect={insertEmoji} activeColor="text-accent-orange bg-accent-orange/15" />
+                    <input ref={inputRef} type="text"
+                      className="flex-1 min-w-0 h-11 sm:h-12 bg-bg-tertiary border border-border-color focus:border-accent-orange rounded-full px-4 sm:px-5 text-sm sm:text-base focus:outline-none focus:ring-1 focus:ring-accent-orange/30 text-text-primary placeholder:text-text-muted transition-all"
+                      placeholder={`Message #${activeGroup.name}…`} value={msgInput} onChange={e => setMsgInput(e.target.value)} />
+                    <button type="submit" disabled={!msgInput.trim()}
+                      className="shrink-0 w-11 h-11 sm:w-12 sm:h-12 rounded-full flex items-center justify-center bg-gradient-to-br from-accent-orange to-red-500 text-white shadow-lg hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+                      aria-label="Send">
+                      <Send className="w-5 h-5" />
+                    </button>
                   </form>
                 </div>
               </div>
 
               {/* ── Group Info Panel ── */}
               {showInfo && (
-                <div className="w-80 border-l border-border-color bg-bg-secondary flex flex-col overflow-y-auto shrink-0">
+                <div className="hidden md:flex w-80 border-l border-border-color bg-bg-secondary flex-col overflow-y-auto shrink-0">
                   <div className="p-5 border-b border-border-color">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-bold text-base">Group Info</h3>
@@ -340,12 +443,15 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
                         </div>
                       </div>
                     ) : (
-                      <div>
-                        <h2 className="font-bold text-lg text-text-primary flex items-center gap-2"><Hash className="w-5 h-5 text-text-muted" />{activeGroup.name}</h2>
+                      <div className="text-center">
+                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-accent-orange to-red-500 flex items-center justify-center text-white font-bold text-2xl mx-auto mb-3">
+                          {(activeGroup.name || '#').charAt(0).toUpperCase()}
+                        </div>
+                        <h2 className="font-bold text-lg text-text-primary">{activeGroup.name}</h2>
                         <p className="text-sm text-text-secondary mt-1">{activeGroup.description || 'No description'}</p>
                         {isAdmin && (
                           <button onClick={() => { setEditName(activeGroup.name); setEditDesc(activeGroup.description || ''); setEditingGroup(true); }}
-                            className="text-xs text-accent-orange hover:underline mt-2 flex items-center gap-1"><Edit3 className="w-3 h-3" /> Edit</button>
+                            className="text-xs text-accent-orange hover:underline mt-3 inline-flex items-center gap-1"><Edit3 className="w-3 h-3" /> Edit group</button>
                         )}
                       </div>
                     )}
@@ -353,14 +459,11 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
 
                   {/* Members */}
                   <div className="p-5 flex-1">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider">Members ({members.length})</h4>
-                    </div>
+                    <h4 className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-3">Members ({members.length})</h4>
 
-                    {/* Add member (admin) */}
                     {isAdmin && (
                       <div className="flex gap-2 mb-4">
-                        <input type="text" value={addMemberInput} onChange={e => setAddMemberInput(e.target.value)} placeholder="Username..."
+                        <input type="text" value={addMemberInput} onChange={e => setAddMemberInput(e.target.value)} placeholder="Add by username…"
                           onKeyDown={e => e.key === 'Enter' && handleAddMember()}
                           className="flex-1 h-9 bg-bg-tertiary border border-border-color rounded-lg px-3 text-xs text-text-primary focus:outline-none focus:border-accent-orange min-w-0" />
                         <Button variant="primary" size="sm" className="h-9 px-3 rounded-lg bg-accent-orange border-0 shrink-0" onClick={handleAddMember} disabled={!addMemberInput.trim()}>
@@ -391,10 +494,8 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
                                 <span className="text-[10px] text-text-muted capitalize">{m.role.toLowerCase()}</span>
                               </div>
 
-                              {/* Actions (visible on hover) */}
                               {!isMe && (isAdmin || isCreator) && (
                                 <div className="opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity shrink-0">
-                                  {/* Promote/Demote */}
                                   {!isMemberCreator && (
                                     isMemberAdmin ? (
                                       isCreator && (
@@ -408,7 +509,6 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
                                       </button>
                                     )
                                   )}
-                                  {/* Remove */}
                                   {(!isMemberAdmin || isCreator) && !isMemberCreator && (
                                     <button onClick={() => handleRemoveMember(m.username)} className="p-1.5 hover:bg-red-500/10 rounded-lg text-text-muted hover:text-red-400 transition-colors" title="Remove">
                                       <UserMinus className="w-3.5 h-3.5" />
@@ -423,7 +523,6 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
                     )}
                   </div>
 
-                  {/* Bottom actions */}
                   <div className="p-4 border-t border-border-color flex flex-col gap-2">
                     <button onClick={handleLeaveGroup} className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm text-red-400 hover:bg-red-500/10 transition-colors">
                       <LogOut className="w-4 h-4" /> Leave Group
@@ -439,9 +538,12 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
             </div>
           </>
         ) : (
-          <div className="flex flex-col justify-center items-center h-full text-text-muted text-lg">
-            <Hash className="w-24 h-24 opacity-30 mb-6" />
-            <p>Select a group to start messaging</p>
+          <div className="flex flex-col justify-center items-center h-full text-center px-6">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-accent-orange/20 to-red-500/10 border border-accent-orange/20 flex items-center justify-center mb-5">
+              <Hash className="w-10 h-10 text-accent-orange" />
+            </div>
+            <h3 className="text-lg font-semibold text-text-primary mb-1.5">Select a group</h3>
+            <p className="text-sm text-text-secondary max-w-sm">Choose a channel from the left to start messaging, or create a new one.</p>
           </div>
         )}
       </div>
@@ -451,22 +553,24 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowCreate(false)}>
           <div className="bg-bg-secondary border border-border-color rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-border-color sticky top-0 bg-bg-secondary z-10">
-              <h2 className="text-lg font-bold text-text-primary">Create Group</h2>
+              <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
+                <Users className="w-5 h-5 text-accent-orange" /> Create Group
+              </h2>
               <button onClick={() => setShowCreate(false)} className="p-1.5 hover:bg-bg-tertiary rounded-lg text-text-muted"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 flex flex-col gap-5">
               <div>
-                <label className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1.5 block">Group Name *</label>
+                <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Group Name *</label>
                 <input type="text" value={createName} onChange={e => setCreateName(e.target.value)} placeholder="e.g. React Devs"
                   className="w-full h-12 bg-bg-tertiary border border-border-color rounded-xl px-4 text-base text-text-primary focus:outline-none focus:border-accent-orange" />
               </div>
               <div>
-                <label className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1.5 block">Description</label>
+                <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Description</label>
                 <textarea value={createDesc} onChange={e => setCreateDesc(e.target.value)} placeholder="What's this group about?" rows={2}
-                  className="w-full bg-bg-tertiary border border-border-color rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none resize-none" />
+                  className="w-full bg-bg-tertiary border border-border-color rounded-xl px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-orange resize-none" />
               </div>
               <div>
-                <label className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1.5 block">Add Members ({selectedMembers.length})</label>
+                <label className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5 block">Add Members ({selectedMembers.length})</label>
                 {selectedMembers.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-3">
                     {selectedMembers.map(m => (
@@ -477,10 +581,11 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
                     ))}
                   </div>
                 )}
-                <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
-                  <input type="text" value={memberSearch} onChange={e => setMemberSearch(e.target.value)} placeholder="Search users..."
-                    className="w-full h-11 bg-bg-tertiary border border-border-color rounded-xl pl-10 pr-4 text-sm text-text-primary focus:outline-none focus:border-accent-orange" />
+                <div className="flex items-center gap-2.5 w-full h-11 bg-bg-tertiary border border-border-color rounded-xl px-3.5 focus-within:border-accent-orange transition-colors">
+                  <Search className="w-4 h-4 text-text-muted shrink-0" />
+                  <input type="text" value={memberSearch} onChange={e => setMemberSearch(e.target.value)} placeholder="Search users…"
+                    className="flex-1 min-w-0 text-sm text-text-primary placeholder:text-text-muted"
+                    style={{ background: 'transparent', border: 'none', outline: 'none', padding: 0, boxShadow: 'none' }} />
                 </div>
                 {searchResults.length > 0 && (
                   <div className="mt-2 bg-bg-tertiary border border-border-color rounded-xl overflow-hidden max-h-40 overflow-y-auto">
@@ -495,6 +600,7 @@ export const GroupChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUs
                   </div>
                 )}
               </div>
+              {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2 rounded-xl text-sm">{error}</div>}
               <div className="flex gap-3 mt-2">
                 <Button variant="outline" className="flex-1 rounded-xl h-12" onClick={() => setShowCreate(false)}>Cancel</Button>
                 <Button variant="primary" className="flex-1 rounded-xl h-12 bg-gradient-to-r from-accent-orange to-red-500 border-0 font-bold" onClick={handleCreateGroup} isLoading={isCreating} disabled={!createName.trim()}>

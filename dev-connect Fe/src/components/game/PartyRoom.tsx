@@ -9,6 +9,7 @@ import { subscribe, isStompConnected } from '../../services/stompClient';
 import { partyJoin, partyLeave, partyStart, partyAction, partyChat, partyRematch } from '../../services/stompClient';
 import { PartyAPI } from '../../services/api';
 import { getAvatarEmoji } from '../../utils/avatars';
+import { GameInviteButton } from './GameInviteButton';
 
 type Phase = 'lobby' | 'waiting' | 'round' | 'result' | 'gameover';
 
@@ -27,14 +28,14 @@ const GAME_META: Record<string, { icon: React.ReactNode; color: string; desc: st
   SECRET_HINT:      { icon: <Hash className="w-5 h-5" />,    color: 'from-teal-500 to-cyan-600', desc: 'Give hints, guess the word' },
 };
 
-export const PartyRoom = ({ currentUser, onBack, initialGameType }: { currentUser: any; onBack: () => void; initialGameType?: string }) => {
+export const PartyRoom = ({ currentUser, onBack, initialGameType, initialRoomId }: { currentUser: any; onBack: () => void; initialGameType?: string; initialRoomId?: string }) => {
   const username = currentUser?.username || '';
 
   // Room state
   const [phase, setPhase] = useState<Phase>('lobby');
   const [roomId, setRoomId] = useState('');
   const [roomInput, setRoomInput] = useState('');
-  const [gameType, setGameType] = useState(initialGameType || 'THIS_OR_THAT');
+  const [gameType] = useState(initialGameType || 'THIS_OR_THAT');
   const [players, setPlayers] = useState<Player[]>([]);
   const [hostUsername, setHostUsername] = useState('');
   const [maxRounds, setMaxRounds] = useState(3);
@@ -223,6 +224,12 @@ export const PartyRoom = ({ currentUser, onBack, initialGameType }: { currentUse
 
   const handleCopy = () => { navigator.clipboard.writeText(roomId); setCopied(true); setTimeout(() => setCopied(false), 2000); };
 
+  // Auto-join when arriving via a chat invite
+  useEffect(() => {
+    if (initialRoomId) handleJoinRoom(initialRoomId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialRoomId]);
+
   const handleSubmitAction = (data: any) => {
     if (submitted || !roomId) return;
     console.log('[Party] Submitting action:', JSON.stringify(data));
@@ -367,6 +374,8 @@ export const PartyRoom = ({ currentUser, onBack, initialGameType }: { currentUse
               {copied ? <CheckCircle className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-text-muted" />}
             </button>
 
+            <GameInviteButton currentUser={currentUser} kind="party" partyKey={gameType} roomId={roomId} label={gameType.replace(/_/g, ' ')} />
+
             {/* Players */}
             <div className="w-full bg-bg-secondary border border-border-color rounded-2xl overflow-hidden">
               <div className="px-4 py-2.5 border-b border-border-color flex items-center justify-between">
@@ -374,7 +383,7 @@ export const PartyRoom = ({ currentUser, onBack, initialGameType }: { currentUse
                 <Users className="w-4 h-4 text-text-muted" />
               </div>
               <div className="p-3 flex flex-col gap-2">
-                {players.map((p, i) => (
+                {players.map((p) => (
                   <div key={p.username} className="flex items-center gap-3 px-3 py-2 bg-bg-tertiary rounded-xl">
                     <div className="w-8 h-8 rounded-full bg-bg-secondary border border-border-color flex items-center justify-center text-lg">
                       {getAvatarEmoji(p.profileAvatar)}

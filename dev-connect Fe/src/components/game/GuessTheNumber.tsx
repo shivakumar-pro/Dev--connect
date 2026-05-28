@@ -7,6 +7,7 @@ import { Button } from '../common/Button';
 import { subscribe } from '../../services/stompClient';
 import { gameJoinRoom, gameSelectNumber, gameGuess, gameChat, gameRematch } from '../../services/stompClient';
 import { GameAPI } from '../../services/api';
+import { GameInviteButton } from './GameInviteButton';
 
 type GamePhase = 'lobby' | 'waiting' | 'selecting' | 'toss' | 'playing' | 'result';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
@@ -21,7 +22,7 @@ const DIFF_CONFIG: Record<Difficulty, { label: string; range: string; min: numbe
   HARD: { label: 'Hard', range: '1 – 1000', min: 1, max: 1000, color: 'from-red-500 to-rose-600' },
 };
 
-export const GuessTheNumber = ({ currentUser, onBack }: { currentUser: any; onBack: () => void }) => {
+export const GuessTheNumber = ({ currentUser, onBack, initialRoomId }: { currentUser: any; onBack: () => void; initialRoomId?: string }) => {
   // Game state
   const [phase, setPhase] = useState<GamePhase>('lobby');
   const [roomId, setRoomId] = useState('');
@@ -239,6 +240,16 @@ export const GuessTheNumber = ({ currentUser, onBack }: { currentUser: any; onBa
     setTimeout(() => gameJoinRoom(id), 500);
   };
 
+  // Auto-join when arriving via a chat invite
+  useEffect(() => {
+    if (!initialRoomId) return;
+    setRoomInput(initialRoomId);
+    setRoomId(initialRoomId);
+    setPhase('waiting');
+    setTimeout(() => gameJoinRoom(initialRoomId), 500);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialRoomId]);
+
   const handleSelectNumber = () => {
     const num = parseInt(numberInput);
     if (isNaN(num) || num < rangeMin || num > rangeMax) return;
@@ -455,6 +466,7 @@ export const GuessTheNumber = ({ currentUser, onBack }: { currentUser: any; onBa
               {copied ? <CheckCircle className="w-4 h-4 text-green-500 shrink-0" /> : <Copy className="w-4 h-4 text-text-muted shrink-0" />}
             </button>
             {copied && <span className="text-xs text-green-500">Copied!</span>}
+            <GameInviteButton currentUser={currentUser} kind="guess" roomId={roomId} label="Guess the Number" />
             <div className="flex gap-1.5 mt-1">
               {[0, 150, 300].map(d => <div key={d} className="w-2 h-2 rounded-full bg-accent-purple animate-bounce" style={{ animationDelay: `${d}ms` }} />)}
             </div>

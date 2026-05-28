@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, Send, MoreVertical, Phone, Video, Loader2, Users, Shield, ShieldOff, ShieldBan, MessageSquarePlus, Inbox, Check, X, ArrowLeft, Trash2 } from 'lucide-react';
 import { Button } from '../common/Button';
+import { Gamepad2 } from 'lucide-react';
 import { MessageAPI, UserAPI, ChatRequestAPI } from '../../services/api';
 import { subscribe, sendPrivateMessage } from '../../services/stompClient';
 import { getAvatarEmoji } from '../../utils/avatars';
+import { parseGameInvite, type GameInvitePayload } from '../../utils/gameInvite';
+import { EmojiPicker } from '../common/EmojiPicker';
 
 type ChatStatus = 'NONE' | 'PENDING_SENT' | 'PENDING_RECEIVED' | 'ACCEPTED' | 'REJECTED' | 'BLOCKED' | 'loading';
 
-export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead }: { currentUser: any; unreadCounts?: Record<string, number>; onMarkRead?: (roomId: string) => void }) => {
+export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead, onJoinGameInvite }: { currentUser: any; unreadCounts?: Record<string, number>; onMarkRead?: (roomId: string) => void; onJoinGameInvite?: (payload: GameInvitePayload) => void }) => {
   const [users, setUsers] = useState<any[]>([]);
   const [activeUser, setActiveUser] = useState<any>(null);
   const [msgInput, setMsgInput] = useState('');
@@ -129,6 +132,11 @@ export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead }: { current
         }
         return;
       }
+
+      // Ignore notifications / events (they carry a `type` and no chat content).
+      // The backend also pushes a NEW_MESSAGE_NOTIFICATION here, which would
+      // otherwise render as a phantom empty bubble.
+      if (msg.type || !msg.content) return;
 
       // Regular message
       if (msg.senderId === currentUser.id) return;
@@ -288,7 +296,7 @@ export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead }: { current
   const renderChatInput = () => {
     if (chatStatus === 'BLOCKED') {
       return (
-        <div className="p-3 sm:p-6 mb-14 lg:mb-0 bg-bg-secondary border-t border-border-color shrink-0">
+        <div className="p-3 sm:p-6 mb-16 lg:mb-0 bg-bg-secondary border-t border-border-color shrink-0">
           <div className="flex items-center justify-center gap-3 py-4 text-text-muted">
             <ShieldBan className="w-5 h-5" />
             <span className="text-sm font-medium">
@@ -306,7 +314,7 @@ export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead }: { current
 
     if (chatStatus === 'NONE' || chatStatus === 'REJECTED') {
       return (
-        <div className="p-3 sm:p-6 mb-14 lg:mb-0 bg-bg-secondary border-t border-border-color shrink-0">
+        <div className="p-3 sm:p-6 mb-16 lg:mb-0 bg-bg-secondary border-t border-border-color shrink-0">
           <div className="max-w-xl mx-auto flex flex-col gap-3">
             <div className="text-center">
               <MessageSquarePlus className="w-8 h-8 text-accent-purple mx-auto mb-2" />
@@ -336,7 +344,7 @@ export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead }: { current
 
     if (chatStatus === 'PENDING_SENT') {
       return (
-        <div className="p-3 sm:p-6 mb-14 lg:mb-0 bg-bg-secondary border-t border-border-color shrink-0">
+        <div className="p-3 sm:p-6 mb-16 lg:mb-0 bg-bg-secondary border-t border-border-color shrink-0">
           <div className="flex items-center justify-center gap-3 py-4 text-text-muted">
             <Loader2 className="w-5 h-5 animate-spin text-accent-purple" />
             <span className="text-sm font-medium">Chat request pending. Waiting for {activeUser?.username} to accept...</span>
@@ -348,7 +356,7 @@ export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead }: { current
     if (chatStatus === 'PENDING_RECEIVED') {
       const req = pendingRequests.find(r => r.senderId === activeUser?.id);
       return (
-        <div className="p-3 sm:p-6 mb-14 lg:mb-0 bg-bg-secondary border-t border-border-color shrink-0">
+        <div className="p-3 sm:p-6 mb-16 lg:mb-0 bg-bg-secondary border-t border-border-color shrink-0">
           <div className="max-w-xl mx-auto flex flex-col items-center gap-3 py-2">
             <p className="text-sm text-text-secondary">{activeUser?.username} wants to chat with you</p>
             {req?.firstMessage && (
@@ -371,7 +379,7 @@ export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead }: { current
 
     if (chatStatus === 'loading') {
       return (
-        <div className="p-3 sm:p-6 mb-14 lg:mb-0 bg-bg-secondary border-t border-border-color shrink-0">
+        <div className="p-3 sm:p-6 mb-16 lg:mb-0 bg-bg-secondary border-t border-border-color shrink-0">
           <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-text-muted" /></div>
         </div>
       );
@@ -379,11 +387,12 @@ export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead }: { current
 
     // ACCEPTED — normal input
     return (
-      <div className="fixed bottom-14 left-0 right-0 lg:static p-3 sm:p-6 bg-bg-secondary border-t border-border-color z-30 shrink-0">
-        <form className="flex items-center gap-2 sm:gap-4 max-w-6xl mx-auto" onSubmit={handleSend}>
+      <div className="fixed bottom-16 left-0 right-0 lg:static lg:bottom-0 p-3 sm:p-6 bg-bg-secondary border-t border-border-color z-30 shrink-0">
+        <form className="flex items-center gap-2 sm:gap-3 max-w-6xl mx-auto" onSubmit={handleSend}>
+          <EmojiPicker onSelect={(e) => setMsgInput((v) => v + e)} />
           <input
             type="text"
-            className="flex-1 h-11 sm:h-14 bg-bg-tertiary border border-border-color focus:border-accent-purple rounded-full px-4 sm:px-6 text-sm sm:text-base focus:outline-none focus:ring-1 focus:ring-accent-purple/30 text-text-primary placeholder:text-text-muted transition-all"
+            className="flex-1 min-w-0 h-11 sm:h-14 bg-bg-tertiary border border-border-color focus:border-accent-purple rounded-full px-4 sm:px-6 text-sm sm:text-base focus:outline-none focus:ring-1 focus:ring-accent-purple/30 text-text-primary placeholder:text-text-muted transition-all"
             placeholder={`Message @${activeUser?.username}...`}
             value={msgInput}
             onChange={(e) => setMsgInput(e.target.value)}
@@ -418,12 +427,13 @@ export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead }: { current
               )}
             </button>
           </div>
-          <div className="relative">
-            <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-text-muted" />
+          <div className="flex items-center gap-2.5 w-full h-12 bg-bg-tertiary border border-border-color rounded-full px-4 shadow-sm transition-colors focus-within:border-accent-purple">
+            <Search className="w-5 h-5 text-text-muted shrink-0" />
             <input
               type="text" placeholder="Search users..."
               value={search} onChange={e => setSearch(e.target.value)}
-              className="w-full h-12 bg-bg-tertiary border border-border-color rounded-full pl-12 pr-5 text-base text-text-primary focus:outline-none focus:border-accent-purple transition-colors shadow-sm"
+              className="flex-1 min-w-0 text-base text-text-primary placeholder:text-text-muted"
+              style={{ background: 'transparent', border: 'none', outline: 'none', padding: 0, boxShadow: 'none' }}
             />
           </div>
         </div>
@@ -594,6 +604,7 @@ export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead }: { current
                 const time = m.createdAt || m.timestamp
                   ? new Date(m.createdAt || m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                   : '';
+                const invite = !m.deleted ? parseGameInvite(m.content) : null;
                 return (
                   <div key={m.id || i} className={`flex gap-2 max-w-[75%] ${isOwn ? 'self-end flex-row-reverse' : ''} ${showAvatar ? 'mt-3' : ''}`}>
                     {!isOwn && showAvatar ? (
@@ -608,6 +619,29 @@ export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead }: { current
                       {!isOwn && showAvatar && (
                         <span className="text-xs font-semibold text-accent-purple mb-0.5 ml-1">{m.senderName || activeUser?.username}</span>
                       )}
+                      {invite ? (
+                        <div className="w-64 rounded-2xl overflow-hidden border border-border-color bg-bg-secondary shadow-md">
+                          <div className="h-1.5 bg-gradient-to-r from-accent-purple to-accent-orange" />
+                          <div className="p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-purple to-accent-orange flex items-center justify-center shrink-0">
+                                <Gamepad2 className="w-4 h-4 text-white" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-[11px] text-text-muted uppercase tracking-wider font-semibold">Game invite</div>
+                                <div className="text-sm font-bold text-text-primary truncate">{invite.label}</div>
+                              </div>
+                            </div>
+                            <p className="text-[11px] text-text-muted font-mono mb-3">Room: {invite.roomId}</p>
+                            <button
+                              onClick={() => onJoinGameInvite?.(invite)}
+                              className="w-full h-9 rounded-lg bg-gradient-to-r from-accent-purple to-accent-orange text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+                            >
+                              Join Room
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
                       <div
                         onContextMenu={(e) => handleMessageContextMenu(e, m)}
                         className={`px-6 py-4 rounded-3xl relative shadow-md min-w-[50px] cursor-context-menu ${
@@ -622,6 +656,7 @@ export const PrivateChat = ({ currentUser, unreadCounts, onMarkRead }: { current
                           {m.deleted ? '🚫 This message was deleted' : m.content}
                         </p>
                       </div>
+                      )}
                       {time && <span className="text-[10px] font-medium text-text-muted mt-0.5 mx-1">{time}</span>}
                     </div>
                   </div>
