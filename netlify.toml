@@ -1,0 +1,15 @@
+# The frontend lives in the "dev-connect Fe" subfolder of this repo,
+# so point Netlify's build there. `publish` is relative to `base`.
+[build]
+  base = "dev-connect Fe"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA fallback: serve index.html for client-side routes (fixes 404 on refresh/deep-links)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

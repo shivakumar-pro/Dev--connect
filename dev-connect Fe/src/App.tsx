@@ -1,4 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+// HashRouter keeps all routing in the URL hash (/#/dashboard), so any static
+// host (and the Capacitor WebView) only ever serves index.html — no SPA
+// rewrite rules needed and no 404s on refresh or deep-links.
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
@@ -23,7 +26,7 @@ const PublicOnly = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <div className="min-h-screen w-full bg-bg-primary text-text-primary font-sans">
         {/* DevConnect-theme floating colorful orbs (CSS shows only for that theme) */}
         <div className="dc-orbs" aria-hidden="true" />
@@ -47,7 +50,7 @@ function App() {
           <Route path="*" element={<Navigate to={isAuthenticated() ? '/dashboard' : '/'} replace />} />
         </Routes>
       </div>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 
