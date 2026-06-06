@@ -41,7 +41,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/groups")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class GroupController {
 
     private final GroupService groupService;

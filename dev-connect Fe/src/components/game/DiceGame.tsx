@@ -1,15 +1,43 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Copy, CheckCircle, Users, Crown, Play, Loader2, RotateCcw, Trophy } from 'lucide-react';
 import { Button } from '../common/Button';
 import { DiceAPI } from '../../services/api';
 import { getAvatarEmoji } from '../../utils/avatars';
 import { GameInviteButton } from './GameInviteButton';
+import { HowToPlay } from './HowToPlay';
+import { Dice3D, DICE_ROLL_MS, DICE_STAGGER } from './Dice3D';
 
 type Phase = 'lobby' | 'waiting' | 'playing' | 'gameover';
 type DiceGameType = 'PIG' | 'FARKLE' | 'LIARS_DICE' | 'SHIP_CAPTAIN_CREW';
 
+const DICE_RULES: Record<DiceGameType, string[]> = {
+  PIG: [
+    'On your turn, roll the die as many times as you like.',
+    'Each roll adds to your running turn total.',
+    'Roll a 1 and you lose the entire turn total!',
+    '"Hold" to bank your points. First to the target score wins.',
+  ],
+  FARKLE: [
+    'Roll 6 dice and set aside scoring dice (1s, 5s, triples…).',
+    'Keep rolling the rest to build your turn score.',
+    'Roll no scoring dice and you "Farkle" — lose the turn’s points.',
+    'Bank anytime. First to the target score wins.',
+  ],
+  LIARS_DICE: [
+    'Everyone rolls their dice hidden under a cup.',
+    'Take turns raising the bid (quantity + face across all dice).',
+    'Think a bid is too high? Call "Liar!".',
+    'Wrong guesser loses a die. Last player with dice wins.',
+  ],
+  SHIP_CAPTAIN_CREW: [
+    'Roll to get a 6 (ship), 5 (captain) and 4 (crew) — in that order.',
+    'Once all three are locked, your last two dice are your cargo.',
+    'You get up to 3 rolls per turn.',
+    'Highest cargo score wins the round.',
+  ],
+};
+
 const DICE_FACES = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-const RANDOM_FACE = () => DICE_FACES[Math.floor(Math.random() * 6)];
 
 const GAME_INFO: Record<DiceGameType, { name: string; desc: string; color: string; target: number; emoji: string }> = {
   PIG:               { name: 'Pig',                desc: 'Roll or hold — but roll a 1 and lose it all!',        color: 'from-yellow-500 to-amber-600',  target: 100,   emoji: '🐷' },
@@ -40,7 +68,9 @@ export const DiceGame = ({ currentUser, onBack, gameType, initialRoomId }: DiceG
 
   // Animation states
   const [rolling, setRolling] = useState(false);
-  const [rollingFaces, setRollingFaces] = useState<string[]>([]);
+  const rollingRef = useRef(false);          // keeps the poll loop from clobbering a live throw
+  const [rollId, setRollId] = useState(0);   // bump to replay the 3D throw
+  const [pendingDice, setPendingDice] = useState<number[] | null>(null); // faces to land on this throw
   const [bustFlash, setBustFlash] = useState(false);
   const [scorePopup, setScorePopup] = useState<{ text: string; color: string } | null>(null);
   const [winConfetti, setWinConfetti] = useState(false);
@@ -69,7 +99,7 @@ export const DiceGame = ({ currentUser, onBack, gameType, initialRoomId }: DiceG
 
   useEffect(() => {
     if (!roomId || phase === 'lobby' || phase === 'gameover') return;
-    const interval = setInterval(() => refreshState(roomId), 2000);
+    const interval = setInterval(() => { if (!rollingRef.current) refreshState(roomId); }, 2000);
     return () => clearInterval(interval);
   }, [roomId, phase]);
 
@@ -109,56 +139,69 @@ export const DiceGame = ({ currentUser, onBack, gameType, initialRoomId }: DiceG
     } catch (err: any) { showError(err?.response?.data?.message || 'Failed to start'); }
   };
 
-  // Dice rolling animation
-  const animateRoll = (count: number, callback: () => void) => {
-    setRolling(true);
-    let frame = 0;
-    const totalFrames = 12;
-    const interval = setInterval(() => {
-      setRollingFaces(Array.from({ length: count }, () => RANDOM_FACE()));
-      frame++;
-      if (frame >= totalFrames) {
-        clearInterval(interval);
-        setRolling(false);
-        setRollingFaces([]);
-        callback();
-      }
-    }, 80);
-  };
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   const handleAction = async (action: string, extra?: any) => {
     setIsActing(true);
-    const diceCount = (state?.gameState?.rolled || myPlayer?.hand || []).length || 1;
 
     if (action === 'roll') {
-      animateRoll(Math.max(diceCount, 1), async () => {
-        try {
-          const res = await DiceAPI.action(roomId, { username, action, ...extra });
-          const d = res.data || res;
-          setResult(d.result || d);
+      // Server-first: learn the outcome, then play a deterministic 3D throw that
+      // lands exactly on the rolled faces before committing the new state.
+      rollingRef.current = true;
+      setRolling(true);
+      try {
+        const res = await DiceAPI.action(roomId, { username, action, ...extra });
+        const d = res.data || res;
+        const r = d.result || d;
+        const ns = d.state;
 
-          // Check for bust
-          const r = d.result || d;
-          if (r.busted || r.event === 'BUST' || r.event === 'FARKLE') {
-            setBustFlash(true);
-            showScorePopup(r.event === 'FARKLE' ? '💥 FARKLE!' : '💀 BUST!', 'text-red-400');
-            setTimeout(() => setBustFlash(false), 1500);
-          } else if (r.scored || r.turnScore) {
-            showScorePopup(`+${r.scored || r.turnScore}`, 'text-green-400');
+        // Resolve the faces to land on. PIG returns a single int (`rolled`);
+        // FARKLE / SHIP_CAPTAIN_CREW return a list. Prefer the freshly-rolled
+        // result over state (state may have advanced or cleared on a bust).
+        const nsMine = ns?.players?.find((p: any) => p.username === username);
+        const raw: any =
+          r.rolled ?? r.dice ??
+          ns?.gameState?.rolled ?? ns?.gameState?.currentRoll ?? ns?.gameState?.lastRoll ??
+          nsMine?.hand;
+        let dice: number[] =
+          typeof raw === 'number' ? [raw]
+          : Array.isArray(raw) && raw.length > 0 ? raw
+          : [1 + Math.floor(Math.random() * 6)];
+        dice = dice.map((n: number) => Math.min(6, Math.max(1, n | 0)) || 1);
+
+        setPendingDice(dice);
+        setRollId((id) => id + 1);
+
+        // Hold the throw until the last staggered die has settled.
+        await sleep(DICE_ROLL_MS + dice.length * DICE_STAGGER + 280);
+
+        // Commit the outcome now that the dice have landed — the reveal lands with the die.
+        setResult(r);
+        if (r.busted || r.event === 'BUST' || r.event === 'FARKLE') {
+          setBustFlash(true);
+          showScorePopup(r.event === 'FARKLE' ? '💥 FARKLE!' : '💀 BUST!', 'text-red-400');
+          setTimeout(() => setBustFlash(false), 1500);
+        } else if (r.scored || r.turnScore) {
+          showScorePopup(`+${r.scored || r.turnScore}`, 'text-green-400');
+        }
+
+        if (ns) {
+          setState(ns);
+          if (ns.status === 'FINISHED' || ns.status === 'ENDED') {
+            setPhase('gameover');
+            if (ns.winner === username) setWinConfetti(true);
           }
-
-          if (d.state) {
-            setState(d.state);
-            if (d.state.status === 'FINISHED' || d.state.status === 'ENDED') {
-              setPhase('gameover');
-              if (d.state.winner === username) setWinConfetti(true);
-            }
-            if (d.state.eventLog) setEventLog(d.state.eventLog.slice(-10));
-          } else await refreshState(roomId);
-          setSelectedIndices([]);
-        } catch (err: any) { showError(err?.response?.data?.message || 'Action failed'); }
-        finally { setIsActing(false); }
-      });
+          if (ns.eventLog) setEventLog(ns.eventLog.slice(-10));
+        } else await refreshState(roomId);
+        setSelectedIndices([]);
+      } catch (err: any) {
+        showError(err?.response?.data?.message || 'Action failed');
+      } finally {
+        rollingRef.current = false;
+        setRolling(false);
+        setPendingDice(null);
+        setIsActing(false);
+      }
       return;
     }
 
@@ -236,6 +279,7 @@ export const DiceGame = ({ currentUser, onBack, gameType, initialRoomId }: DiceG
         <button onClick={onBack} className="p-1.5 hover:bg-white/[0.04] rounded-xl text-slate-400">
           <ArrowLeft className="w-5 h-5" />
         </button>
+        <HowToPlay title={`How to play · ${info.name}`} steps={DICE_RULES[gameType]} />
         <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${info.color} flex items-center justify-center shrink-0 text-lg`}>
           {info.emoji}
         </div>
@@ -388,17 +432,23 @@ export const DiceGame = ({ currentUser, onBack, gameType, initialRoomId }: DiceG
                 )}
               </div>
 
-              <div className="flex justify-center gap-3 sm:gap-4 flex-wrap min-h-[70px]">
+              {(() => {
+                const lr = state.gameState?.lastRoll;
+                const restingDice: number[] =
+                  state.gameState?.rolled
+                  || state.gameState?.currentRoll
+                  || (typeof lr === 'number' ? [lr] : null)
+                  || myPlayer?.hand
+                  || [];
+                return (
+              <div className="flex justify-center items-end gap-2 sm:gap-4 flex-wrap min-h-[96px]">
                 {rolling ? (
-                  // Rolling animation
-                  rollingFaces.map((face, i) => (
-                    <div key={i} className="w-14 h-14 sm:w-[72px] sm:h-[72px] rounded-2xl bg-gradient-to-br from-white/10 to-white/[0.02] border border-white/10 flex items-center justify-center text-3xl sm:text-4xl shadow-lg"
-                      style={{ animation: `spin 0.3s ease-in-out ${i * 0.05}s infinite alternate, wobble 0.2s ease-in-out ${i * 0.08}s infinite` }}>
-                      {face}
-                    </div>
+                  // Cinematic 3D throw — each die lands on its real face, lightly staggered.
+                  (pendingDice || [1]).map((val, i) => (
+                    <Dice3D key={i} value={val} rolling rollId={rollId} size={58} delay={i * DICE_STAGGER} />
                   ))
                 ) : (
-                  (state.gameState?.rolled || myPlayer?.hand || []).map((val: number, i: number) => {
+                  restingDice.map((val: number, i: number) => {
                     const isSelected = selectedIndices.includes(i);
                     const canSelect = gameType === 'FARKLE' && isMyTurn;
                     return (
@@ -408,22 +458,24 @@ export const DiceGame = ({ currentUser, onBack, gameType, initialRoomId }: DiceG
                           if (!canSelect) return;
                           setSelectedIndices(prev => prev.includes(i) ? prev.filter(x => x !== i) : [...prev, i]);
                         }}
-                        className={`w-14 h-14 sm:w-[72px] sm:h-[72px] rounded-2xl text-3xl sm:text-4xl flex items-center justify-center transition-all duration-200 shadow-lg ${
+                        className={`rounded-2xl flex items-center justify-center transition-all duration-200 ${
                           isSelected
-                            ? 'bg-yellow-500/20 border-2 border-yellow-400 scale-110 rotate-6 shadow-yellow-500/20'
-                            : 'bg-gradient-to-br from-white/10 to-white/[0.02] border border-white/10 hover:border-white/20 hover:scale-105'
+                            ? 'bg-yellow-500/20 ring-2 ring-yellow-400 scale-110 shadow-yellow-500/20'
+                            : 'hover:scale-105'
                         } ${canSelect ? 'cursor-pointer active:scale-95' : 'cursor-default'}
-                        ${val === 1 && gameType === 'PIG' ? 'border-red-500/50 shadow-red-500/20' : ''}`}
+                        ${val === 1 && gameType === 'PIG' ? 'ring-2 ring-red-500/50' : ''}`}
                       >
-                        {DICE_FACES[val - 1] || val}
+                        <Dice3D value={val} rolling={false} size={58} />
                       </button>
                     );
                   })
                 )}
-                {!rolling && !(state.gameState?.rolled || myPlayer?.hand || []).length && (
+                {!rolling && !restingDice.length && (
                   <div className="text-slate-600 text-sm py-6">Roll the dice to start!</div>
                 )}
               </div>
+                );
+              })()}
             </div>
 
             {/* Liar's Dice — Current Bid */}
@@ -613,17 +665,6 @@ export const DiceGame = ({ currentUser, onBack, gameType, initialRoomId }: DiceG
         )}
       </div>
 
-      {/* CSS Animations */}
-      <style>{`
-        @keyframes wobble {
-          0% { transform: rotate(-8deg); }
-          100% { transform: rotate(8deg); }
-        }
-        @keyframes spin {
-          0% { transform: scale(0.9); }
-          100% { transform: scale(1.1); }
-        }
-      `}</style>
     </div>
   );
 };

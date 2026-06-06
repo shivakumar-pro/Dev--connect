@@ -2,7 +2,7 @@
 // is a JSON marker. No backend change is needed — the message travels through
 // the normal private-message pipeline and the recipient parses it back.
 
-export type GameInviteKind = 'guess' | 'dice' | 'party';
+export type GameInviteKind = 'guess' | 'dice' | 'party' | 'chowka' | 'phase10' | 'toxic';
 export type DiceType = 'PIG' | 'FARKLE' | 'LIARS_DICE' | 'SHIP_CAPTAIN_CREW';
 
 export interface GameInvitePayload {

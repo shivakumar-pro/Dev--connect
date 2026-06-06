@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Globe, Loader2, Sparkles } from 'lucide-react';
 import { EmojiPicker } from '../common/EmojiPicker';
 import { MessageAPI } from '../../services/api';
-import { subscribe, sendGlobalMessage } from '../../services/stompClient';
+import { subscribe, sendGlobalMessage, isStompConnected } from '../../services/stompClient';
 import { getAvatarEmoji } from '../../utils/avatars';
 
 interface Message {
@@ -47,7 +47,12 @@ export const GlobalChat = ({ currentUser, onMarkRead }: { currentUser?: any; unr
     const fetchGlobalMessages = async () => {
       try {
         const res = await MessageAPI.getGlobal(50);
-        const data = Array.isArray(res) ? res : [];
+        // The API wraps the list in ApiResponse: { success, message, data: [...] }.
+        // Unwrap that, but still accept a raw array or a paginated { content: [...] }.
+        const data: any[] = Array.isArray(res) ? res
+          : Array.isArray(res?.data) ? res.data
+          : Array.isArray(res?.content) ? res.content
+          : [];
         data.sort((a: any, b: any) => new Date(a.createdAt || a.timestamp || 0).getTime() - new Date(b.createdAt || b.timestamp || 0).getTime());
         const mapped: Message[] = data.map((m: any) => {
           const ms = new Date(m.createdAt || m.timestamp || Date.now()).getTime();
@@ -101,22 +106,32 @@ export const GlobalChat = ({ currentUser, onMarkRead }: { currentUser?: any; unr
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim() || isSending) return;
+    const text = inputValue.trim();
+    if (!text || isSending) return;
+
+    // Optimistic bubble so the UI always responds instantly.
+    const now = Date.now();
+    setMessages(prev => [...prev, {
+      id: now.toString(),
+      senderName: currentUsername,
+      content: text,
+      sentAt: now,
+      timestamp: new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isOwn: true,
+    }]);
+    setInputValue('');
+    inputRef.current?.focus();
+
+    // Send over the socket when it's live; otherwise fall back to REST (same
+    // server path persists + broadcasts to /topic/global), so a flaky/closed
+    // WebSocket never silently drops the message.
+    const restSend = () => MessageAPI.send({ roomId: 'global', roomType: 'GLOBAL', content: text, messageType: 'TEXT' });
     try {
-      sendGlobalMessage(inputValue);
-      const now = Date.now();
-      setMessages(prev => [...prev, {
-        id: now.toString(),
-        senderName: currentUsername,
-        content: inputValue,
-        sentAt: now,
-        timestamp: new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isOwn: true,
-      }]);
-      setInputValue('');
-      inputRef.current?.focus();
+      if (isStompConnected()) sendGlobalMessage(text);
+      else await restSend();
     } catch (err) {
-      console.error('Failed to send message', err);
+      try { await restSend(); }
+      catch (e2) { console.error('Failed to send message', e2); }
     }
   };
 

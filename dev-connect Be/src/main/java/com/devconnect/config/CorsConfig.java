@@ -7,7 +7,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -15,16 +14,11 @@ import java.util.List;
 public class CorsConfig {
 
     /**
-     * Always-allowed origins for local development and the Capacitor mobile shell,
-     * merged with whatever {@code cors.allowed-origin-patterns} (FRONTEND_URL) provides.
-     * Using patterns (with a wildcard port) so any Vite dev port works.
+     * Allowed origin patterns come entirely from {@code cors.allowed-origin-patterns}
+     * (backed by the FRONTEND_URL env var). Locally this defaults to "*" (allow everything);
+     * in production set FRONTEND_URL to the specific frontend origin(s), comma-separated
+     * (e.g. "https://app.example.com,capacitor://localhost").
      */
-    private static final List<String> DEV_ORIGIN_PATTERNS = List.of(
-            "http://localhost:*", "https://localhost:*",
-            "http://127.0.0.1:*", "https://127.0.0.1:*",
-            "capacitor://localhost", "ionic://localhost"
-    );
-
     @Value("${cors.allowed-origin-patterns:*}")
     private String allowedOriginPatterns;
 
@@ -44,11 +38,7 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        List<String> patterns = new ArrayList<>(split(allowedOriginPatterns));
-        for (String dev : DEV_ORIGIN_PATTERNS) {
-            if (!patterns.contains(dev)) patterns.add(dev);
-        }
-        configuration.setAllowedOriginPatterns(patterns);
+        configuration.setAllowedOriginPatterns(split(allowedOriginPatterns));
         configuration.setAllowedMethods(split(allowedMethods));
         configuration.setAllowedHeaders(split(allowedHeaders));
         configuration.setAllowCredentials(allowCredentials);

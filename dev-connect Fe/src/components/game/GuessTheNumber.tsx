@@ -8,6 +8,7 @@ import { subscribe } from '../../services/stompClient';
 import { gameJoinRoom, gameSelectNumber, gameGuess, gameChat, gameRematch } from '../../services/stompClient';
 import { GameAPI } from '../../services/api';
 import { GameInviteButton } from './GameInviteButton';
+import { HowToPlay } from './HowToPlay';
 
 type GamePhase = 'lobby' | 'waiting' | 'selecting' | 'toss' | 'playing' | 'result';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
@@ -312,6 +313,16 @@ export const GuessTheNumber = ({ currentUser, onBack, initialRoomId }: { current
         <button onClick={onBack} className="p-1.5 sm:p-2 hover:bg-bg-tertiary rounded-xl transition-colors text-text-secondary">
           <ArrowLeft className="w-5 h-5" />
         </button>
+        <HowToPlay
+          title="How to play · Guess the Number"
+          steps={[
+            'One player secretly picks a number within the chosen range.',
+            'Players take turns guessing the opponent’s number.',
+            'After each guess you get a "higher" or "lower" hint.',
+            'First to guess the opponent’s number wins the round.',
+          ]}
+          tip="Use the hints to halve the range with every guess."
+        />
         <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shrink-0">
           <Target className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
         </div>

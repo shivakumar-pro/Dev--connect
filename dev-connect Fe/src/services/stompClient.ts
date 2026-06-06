@@ -239,6 +239,44 @@ export function phase10Chat(roomId: string, message: string) {
   stompPublish('/app/phase10/chat', JSON.stringify({ roomId, message }));
 }
 
+// --- Chowka Bara (Board Game) ---
+
+export function chowkaJoin(roomId: string) {
+  stompPublish(`/app/chowka/join/${roomId}`);
+}
+
+export function chowkaLeave(roomId: string) {
+  stompPublish(`/app/chowka/leave/${roomId}`);
+}
+
+export function chowkaStart(roomId: string) {
+  stompPublish(`/app/chowka/start/${roomId}`);
+}
+
+export function chowkaAddBot(roomId: string) {
+  stompPublish(`/app/chowka/add-bot/${roomId}`);
+}
+
+export function chowkaRemoveBot(roomId: string, botName: string) {
+  stompPublish('/app/chowka/remove-bot', JSON.stringify({ roomId, botName }));
+}
+
+export function chowkaRematch(roomId: string) {
+  stompPublish(`/app/chowka/rematch/${roomId}`);
+}
+
+export function chowkaRoll(roomId: string) {
+  stompPublish(`/app/chowka/roll/${roomId}`);
+}
+
+export function chowkaMove(roomId: string, pieceId: number) {
+  stompPublish('/app/chowka/move', JSON.stringify({ roomId, pieceId }));
+}
+
+export function chowkaChat(roomId: string, message: string) {
+  stompPublish('/app/chowka/chat', JSON.stringify({ roomId, message }));
+}
+
 // --- WebRTC Signaling ---
 
 export function sendSignal(signal: any) {

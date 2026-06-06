@@ -6,9 +6,12 @@ import { GroupChat } from '../components/chat/GroupChat';
 import { GameRoom, type GameJoinInvite } from '../components/game/GameRoom';
 import { CallOverlay } from '../components/call/CallOverlay';
 import { ProfileEditor } from '../components/profile/ProfileEditor';
+import { Home } from '../components/dashboard/Home';
+import { Leaderboard } from '../components/leaderboard/Leaderboard';
 import {
   LogOut, MessageCircle, Gamepad2, Film, BookOpen, Settings,
   ChevronRight, Globe, Lock, Users, Flame, MonitorPlay, Star, User,
+  Home as HomeIcon, Trophy,
 } from 'lucide-react';
 import { UserAPI, MessageAPI } from '../services/api';
 import { activateStompClient, deactivateStompClient, isStompConnected, subscribe } from '../services/stompClient';
@@ -35,6 +38,14 @@ interface MenuItem {
 
 const MENU: MenuItem[] = [
   {
+    key: 'home',
+    label: 'Home',
+    icon: <HomeIcon className="w-[22px] h-[22px]" />,
+    color: 'text-accent-orange',
+    bgColor: 'bg-accent-orange/10',
+    gradient: 'from-accent-orange to-amber-500',
+  },
+  {
     key: 'chat',
     label: 'Chat',
     icon: <MessageCircle className="w-[22px] h-[22px]" />,
@@ -42,9 +53,9 @@ const MENU: MenuItem[] = [
     bgColor: 'bg-accent-purple/10',
     gradient: 'from-accent-purple to-accent-hover',
     children: [
-      { key: 'global', label: 'Global Chat', icon: <Globe className="w-4 h-4" /> },
       { key: 'private', label: 'Private Chat', icon: <Lock className="w-4 h-4" /> },
       { key: 'group', label: 'Groups', icon: <Users className="w-4 h-4" /> },
+      { key: 'global', label: 'Global Chat', icon: <Globe className="w-4 h-4" /> },
     ],
   },
   {
@@ -54,6 +65,14 @@ const MENU: MenuItem[] = [
     color: 'text-accent-orange',
     bgColor: 'bg-accent-orange/10',
     gradient: 'from-accent-orange to-red-500',
+  },
+  {
+    key: 'leaderboard',
+    label: 'Leaderboard',
+    icon: <Trophy className="w-[22px] h-[22px]" />,
+    color: 'text-yellow-500',
+    bgColor: 'bg-yellow-500/10',
+    gradient: 'from-yellow-500 to-amber-600',
   },
   {
     key: 'movies',
@@ -82,9 +101,9 @@ const MENU: MenuItem[] = [
 
 export const Dashboard = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('chat');
-  const [activeChild, setActiveChild] = useState('global');
-  const [expandedTab, setExpandedTab] = useState<string | null>('chat');
+  const [activeTab, setActiveTab] = useState('home');
+  const [activeChild, setActiveChild] = useState('private');
+  const [expandedTab, setExpandedTab] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showProfile, setShowProfile] = useState(false);
   const [stompStatus, setStompStatus] = useState(false);
@@ -213,7 +232,7 @@ export const Dashboard = () => {
         <div className="h-[72px] flex items-center px-5 gap-3 border-b border-border-color shrink-0">
           <button
             className="logo-3d w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
-            onClick={() => { setActiveTab('chat'); setExpandedTab('chat'); setActiveChild('global'); }}
+            onClick={() => { setActiveTab('home'); setExpandedTab(null); }}
             aria-label="DevConnect home"
           >
             <span className="text-white font-extrabold text-lg">D</span>
@@ -367,6 +386,8 @@ export const Dashboard = () => {
 
         {/* Content */}
         <div className="flex-1 flex min-h-0">
+          {activeTab === 'home' && <Home currentUser={currentUser} onNavigate={(tab, child) => { setActiveTab(tab); if (child) { setActiveChild(child); setExpandedTab(tab); } else { setExpandedTab(null); } }} />}
+          {activeTab === 'leaderboard' && <Leaderboard currentUser={currentUser} />}
           {activeTab === 'chat' && activeChild === 'global' && <GlobalChat currentUser={currentUser} unreadCounts={unreadCounts} onMarkRead={markChatAsRead} />}
           {activeTab === 'chat' && activeChild === 'private' && <PrivateChat currentUser={currentUser} unreadCounts={unreadCounts} onMarkRead={markChatAsRead} onJoinGameInvite={routeToGameInvite} />}
           {activeTab === 'chat' && activeChild === 'group' && <GroupChat currentUser={currentUser} unreadCounts={unreadCounts} onMarkRead={markChatAsRead} />}

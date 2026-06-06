@@ -34,7 +34,6 @@ import java.util.NoSuchElementException;
 @RestController
 @RequestMapping("/api/dice")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class DiceController {
 
     private final DiceGameService service;

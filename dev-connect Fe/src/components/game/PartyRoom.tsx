@@ -10,12 +10,21 @@ import { partyJoin, partyLeave, partyStart, partyAction, partyChat, partyRematch
 import { PartyAPI } from '../../services/api';
 import { getAvatarEmoji } from '../../utils/avatars';
 import { GameInviteButton } from './GameInviteButton';
+import { HowToPlay } from './HowToPlay';
 
 type Phase = 'lobby' | 'waiting' | 'round' | 'result' | 'gameover';
 
 interface Player { username: string; score: number; connected: boolean; profileAvatar?: string }
 interface ChatMsg { sender: string; message: string }
 interface RoundResult { [player: string]: any }
+
+// Minimum players to start a party game. Anything not listed defaults to 2.
+// These mirror the backend's PartyGameService rules.
+const GAME_MIN_PLAYERS: Record<string, number> = {
+  BLUFF: 3,
+  SECRET_HINT: 3,
+};
+const getMinPlayers = (gameType: string) => GAME_MIN_PLAYERS[gameType] ?? 2;
 
 const GAME_META: Record<string, { icon: React.ReactNode; color: string; desc: string }> = {
   GUESS_THE_NUMBER: { icon: <Target className="w-5 h-5" />, color: 'from-purple-500 to-pink-500', desc: 'Guess the secret number!' },
@@ -40,7 +49,9 @@ export const PartyRoom = ({ currentUser, onBack, initialGameType, initialRoomId 
   const [hostUsername, setHostUsername] = useState('');
   const [maxRounds, setMaxRounds] = useState(3);
   const [timerSeconds, setTimerSeconds] = useState(15);
-  const [maxPlayers, setMaxPlayers] = useState(2);
+  // Default room capacity is at least the game's minimum (e.g. Bluff needs 3).
+  const minPlayers = getMinPlayers(initialGameType || 'THIS_OR_THAT');
+  const [maxPlayers, setMaxPlayers] = useState(Math.max(2, minPlayers));
   const [currentRound, setCurrentRound] = useState(0);
 
   // Round state
@@ -255,6 +266,15 @@ export const PartyRoom = ({ currentUser, onBack, initialGameType, initialRoomId 
         <button onClick={() => { if (roomId) partyLeave(roomId); onBack(); }} className="p-1.5 hover:bg-bg-tertiary rounded-xl text-text-secondary">
           <ArrowLeft className="w-5 h-5" />
         </button>
+        <HowToPlay
+          title={`How to play · ${gameType.replace(/_/g, ' ')}`}
+          steps={[
+            meta.desc,
+            'Wait in the lobby for friends to join, then the host starts the game.',
+            'Each round, read the prompt and submit your answer before the timer ends.',
+            'Score points every round — the highest total at the end wins!',
+          ]}
+        />
         <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${meta.color} flex items-center justify-center text-white shrink-0`}>
           {meta.icon}
         </div>
@@ -321,8 +341,11 @@ export const PartyRoom = ({ currentUser, onBack, initialGameType, initialRoomId 
                 <div>
                   <label className="text-[10px] font-bold text-text-muted uppercase mb-1 block">Players</label>
                   <select value={maxPlayers} onChange={e => setMaxPlayers(+e.target.value)} className="w-full h-10 bg-bg-tertiary border border-border-color rounded-lg px-2 text-sm text-text-primary">
-                    {[2,4,6,8].map(n => <option key={n} value={n}>{n}</option>)}
+                    {[2,3,4,6,8].filter(n => n >= minPlayers).map(n => <option key={n} value={n}>{n}</option>)}
                   </select>
+                  {minPlayers > 2 && (
+                    <p className="text-[10px] text-text-muted mt-1">Needs at least {minPlayers} players</p>
+                  )}
                 </div>
               </div>
               <Button variant="primary" size="lg" className={`w-full bg-gradient-to-r ${meta.color} border-0 rounded-xl h-12 text-base font-bold`} onClick={handleCreateRoom} isLoading={isCreating}>

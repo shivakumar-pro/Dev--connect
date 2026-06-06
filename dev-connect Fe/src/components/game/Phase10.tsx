@@ -15,6 +15,8 @@ import {
   phase10Draw, phase10Lay, phase10Hit, phase10Discard, phase10Chat, phase10Rematch,
 } from '../../services/stompClient';
 import { Phase10API } from '../../services/api';
+import { HowToPlay } from './HowToPlay';
+import { GameInviteButton } from './GameInviteButton';
 
 // ──────────────────────────── Types ────────────────────────────
 type CColor = 'RED' | 'BLUE' | 'GREEN' | 'YELLOW' | 'NONE';
@@ -603,6 +605,10 @@ export const Phase10 = ({ currentUser, onBack, initialRoomId }: {
             ))}
           </div>
 
+          <div className="mb-3">
+            <GameInviteButton currentUser={currentUser} kind="phase10" roomId={roomId} label="Phase 10" className="w-full justify-center" />
+          </div>
+
           {isHost ? (
             <button
               onClick={() => phase10Start(roomId)}
@@ -1071,6 +1077,16 @@ function MenuScreen(props: {
     <div className="flex flex-col h-full w-full bg-bg-primary pb-16 lg:pb-0">
       <header className="h-12 sm:h-14 px-3 border-b border-border-color flex items-center gap-2 shrink-0 bg-bg-secondary/80">
         <button onClick={onBack} className="flex items-center gap-1.5 text-text-secondary hover:text-text-primary text-sm"><ArrowLeft className="w-4 h-4" /> Games</button>
+        <HowToPlay
+          title="How to play · Phase 10"
+          steps={[
+            'Each round, try to complete the current Phase’s goal (sets and/or runs).',
+            'On your turn: draw a card (deck or discard), then discard one.',
+            'Once you can, lay down your phase, then "hit" extra cards onto melds.',
+            'Complete a phase to advance. First to finish all 10 phases wins!',
+          ]}
+          tip="Add bots from the lobby to fill the table."
+        />
       </header>
       <div className="flex-1 overflow-y-auto px-4 py-6 max-w-md mx-auto w-full">
         <div className="text-center mb-6">

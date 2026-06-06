@@ -173,7 +173,7 @@ public class DiceGameService {
 
     private void initPig(DiceRoom r) {
         r.getGameState().put("turnScore", 0);
-        r.getGameState().put("lastRoll", null);
+        r.getGameState().put("lastRoll", 0);
     }
 
     private Map<String, Object> handlePigAction(DiceRoom r, DiceActionRequest req) {
@@ -382,7 +382,7 @@ public class DiceGameService {
         }
         r.getGameState().put("currentBidQty", 0);
         r.getGameState().put("currentBidFace", 0);
-        r.getGameState().put("currentBidder", null);
+        r.getGameState().remove("currentBidder"); // absent == no active bid (ConcurrentHashMap forbids null)
         r.getGameState().put("round", 1);
     }
 
@@ -464,7 +464,7 @@ public class DiceGameService {
                     }
                     gs.put("currentBidQty", 0);
                     gs.put("currentBidFace", 0);
-                    gs.put("currentBidder", null);
+                    gs.remove("currentBidder"); // absent == no active bid (ConcurrentHashMap forbids null)
                     gs.put("round", (int) gs.getOrDefault("round", 1) + 1);
 
                     String startNext = loserPlayer.isEliminated() ? curBidder : loser;

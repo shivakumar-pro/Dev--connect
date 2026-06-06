@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
 import {
   Gamepad2, Trophy, Users, Crown, Target, Zap, Sparkles, Eye, Lightbulb,
-  HelpCircle, Brain, Hash, Dices, ArrowRight,
+  HelpCircle, Brain, Hash, Dices, ArrowRight, FlaskConical, Castle, Skull,
 } from 'lucide-react';
 import { GuessTheNumber } from './GuessTheNumber';
 import { PartyRoom } from './PartyRoom';
 import { DiceGame } from './DiceGame';
 import { Phase10 } from './Phase10';
+import { BottleShuffle } from './BottleShuffle';
+import { ChowkaBara } from './ChowkaBara';
+import { ToxicBite } from './ToxicBite';
+import { isGameHidden } from '../../utils/hiddenGames';
 
 // Proper "playing cards" glyph for Phase 10 (two fanned cards with a 10 pip).
 const Phase10Icon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -40,6 +44,20 @@ interface Category {
 
 const CATEGORIES: Category[] = [
   {
+    title: 'Board Games',
+    emoji: '♟️',
+    description: 'Classic strategy board games, online with friends',
+    games: [
+      {
+        id: 'chowka_bara', name: 'Chowka Bara',
+        description: 'The classic Indian cross-and-circle race — roll cowries, capture & race home!',
+        icon: <Castle className="w-5 h-5" />, players: '2-4',
+        gradient: 'from-orange-500 to-rose-600', bgGlow: 'shadow-orange-500/20',
+        type: 'standalone',
+      },
+    ],
+  },
+  {
     title: 'Card Games',
     emoji: '🃏',
     description: 'Classic card games to play with friends',
@@ -63,6 +81,13 @@ const CATEGORIES: Category[] = [
         description: 'Classic 1v1 — pick, guess, win. Best of rounds!',
         icon: <Target className="w-5 h-5" />, players: '2',
         gradient: 'from-indigo-500 to-purple-500', bgGlow: 'shadow-indigo-500/20',
+        type: 'standalone',
+      },
+      {
+        id: 'toxic_bite', name: 'Toxic Bite',
+        description: 'Hide the poison. Trust no food. Eat safe or die trying.',
+        icon: <Skull className="w-5 h-5" />, players: '2',
+        gradient: 'from-emerald-600 via-lime-600 to-rose-600', bgGlow: 'shadow-rose-500/20',
         type: 'standalone',
       },
       {
@@ -92,6 +117,13 @@ const CATEGORIES: Category[] = [
         icon: <Brain className="w-5 h-5" />, players: '2-8',
         gradient: 'from-violet-500 to-purple-600', bgGlow: 'shadow-violet-500/20',
         type: 'party', partyKey: 'MEMORY_GAME',
+      },
+      {
+        id: 'bottle_shuffle', name: 'Bottle Shuffle Match',
+        description: 'Crack the hidden order of 5 bottles — fewest guesses wins!',
+        icon: <FlaskConical className="w-5 h-5" />, players: '2-4',
+        gradient: 'from-emerald-500 to-teal-600', bgGlow: 'shadow-emerald-500/20',
+        type: 'standalone',
       },
       {
         id: 'predict_me', name: 'Predict Me',
@@ -183,7 +215,7 @@ const REVERSE_DICE: Record<DiceTypeKey, string> = {
 };
 
 export interface GameJoinInvite {
-  kind: 'guess' | 'dice' | 'party';
+  kind: 'guess' | 'dice' | 'party' | 'chowka' | 'phase10' | 'toxic';
   roomId: string;
   diceType?: DiceTypeKey;
   partyKey?: string;
@@ -203,6 +235,12 @@ export const GameRoom = ({ currentUser, joinInvite, onInviteConsumed }: { curren
     } else if (joinInvite.kind === 'party') {
       setActivePartyKey(joinInvite.partyKey);
       setActiveGame('party');
+    } else if (joinInvite.kind === 'chowka') {
+      setActiveGame('chowka_bara');
+    } else if (joinInvite.kind === 'phase10') {
+      setActiveGame('phase10');
+    } else if (joinInvite.kind === 'toxic') {
+      setActiveGame('toxic_bite');
     } else if (joinInvite.kind === 'dice' && joinInvite.diceType) {
       setActiveGame(REVERSE_DICE[joinInvite.diceType]);
     }
@@ -217,6 +255,15 @@ export const GameRoom = ({ currentUser, joinInvite, onInviteConsumed }: { curren
   }
   if (activeGame === 'phase10') {
     return <Phase10 currentUser={currentUser} onBack={exitGame} initialRoomId={inviteRoomId} />;
+  }
+  if (activeGame === 'bottle_shuffle') {
+    return <BottleShuffle currentUser={currentUser} onBack={exitGame} />;
+  }
+  if (activeGame === 'chowka_bara') {
+    return <ChowkaBara currentUser={currentUser} onBack={exitGame} initialRoomId={inviteRoomId} />;
+  }
+  if (activeGame === 'toxic_bite') {
+    return <ToxicBite currentUser={currentUser} onBack={exitGame} initialRoomId={inviteRoomId} />;
   }
   if (activeGame === 'party') {
     return <PartyRoom currentUser={currentUser} onBack={exitGame} initialGameType={activePartyKey} initialRoomId={inviteRoomId} />;
@@ -235,7 +282,12 @@ export const GameRoom = ({ currentUser, joinInvite, onInviteConsumed }: { curren
     }
   };
 
-  const totalGames = CATEGORIES.reduce((sum, c) => sum + c.games.length, 0);
+  // Hide games flagged in src/utils/hiddenGames.ts and drop categories that
+  // end up empty after filtering.
+  const visibleCategories = CATEGORIES
+    .map(c => ({ ...c, games: c.games.filter(g => !isGameHidden(g.id)) }))
+    .filter(c => c.games.length > 0);
+  const totalGames = visibleCategories.reduce((sum, c) => sum + c.games.length, 0);
 
   return (
     <div className="flex flex-col h-full w-full bg-bg-primary">
@@ -287,7 +339,7 @@ export const GameRoom = ({ currentUser, joinInvite, onInviteConsumed }: { curren
 
           {/* Categories */}
           <div className="flex flex-col gap-10 sm:gap-12">
-            {CATEGORIES.map((cat) => (
+            {visibleCategories.map((cat) => (
               <section key={cat.title}>
                 {/* Category Header */}
                 <div className="flex items-center justify-between gap-3 mb-4 sm:mb-5 pb-3 border-b border-border-color">

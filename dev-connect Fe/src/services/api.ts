@@ -70,6 +70,51 @@ export const DiceAPI = {
   action: (id: string, data: any) => api.post(`/dice/rooms/${id}/action`, data).then(r => r.data),
 };
 
+export const BottleAPI = {
+  listRooms: () => api.get('/bottle/rooms').then(r => r.data),
+  createRoom: (data: { hostUsername: string; maxPlayers?: number; bottleCount?: number }) => api.post('/bottle/rooms', data).then(r => r.data),
+  getRoom: (id: string, username: string) => api.get(`/bottle/rooms/${id}?username=${username}`).then(r => r.data),
+  join: (id: string, username: string) => api.post(`/bottle/rooms/${id}/join`, { username }).then(r => r.data),
+  leave: (id: string, username: string) => api.post(`/bottle/rooms/${id}/leave`, { username }).then(r => r.data),
+  start: (id: string, username: string) => api.post(`/bottle/rooms/${id}/start`, { username }).then(r => r.data),
+  addBot: (id: string, username: string) => api.post(`/bottle/rooms/${id}/add-bot`, { username }).then(r => r.data),
+  removeBot: (id: string, username: string, botName: string) => api.post(`/bottle/rooms/${id}/remove-bot`, { username, botName }).then(r => r.data),
+  submit: (id: string, data: { username: string; arrangement: string[] }) => api.post(`/bottle/rooms/${id}/submit`, data).then(r => r.data),
+  rematch: (id: string, username: string) => api.post(`/bottle/rooms/${id}/rematch`, { username }).then(r => r.data),
+  chat: (id: string, username: string, message: string) => api.post(`/bottle/rooms/${id}/chat`, { username, message }).then(r => r.data),
+};
+
+export const ToxicAPI = {
+  listRooms: () => api.get('/toxic/rooms').then(r => r.data),
+  createRoom: (data: { hostUsername: string; rounds?: number; maxPlayers?: number }) =>
+    api.post('/toxic/rooms', data).then(r => r.data),
+  getRoom: (id: string, username: string) =>
+    api.get(`/toxic/rooms/${id}?username=${username}`).then(r => r.data),
+  join: (id: string, username: string) =>
+    api.post(`/toxic/rooms/${id}/join`, { username }).then(r => r.data),
+  leave: (id: string, username: string) =>
+    api.post(`/toxic/rooms/${id}/leave`, { username }).then(r => r.data),
+  start: (id: string, username: string) =>
+    api.post(`/toxic/rooms/${id}/start`, { username }).then(r => r.data),
+  action: (id: string, data: { username: string; action: 'poison' | 'eat'; position: number }) =>
+    api.post(`/toxic/rooms/${id}/action`, data).then(r => r.data),
+  nextRound: (id: string, username: string) =>
+    api.post(`/toxic/rooms/${id}/next-round`, { username }).then(r => r.data),
+};
+
+export const ChowkaAPI = {
+  listRooms: () => api.get('/chowka/rooms').then(r => r.data),
+  createRoom: (data: { hostUsername: string; maxPlayers?: number; openStart?: boolean }) =>
+    api.post('/chowka/rooms', data).then(r => r.data),
+  getRoom: (id: string) => api.get(`/chowka/rooms/${id}`).then(r => r.data),
+};
+
+export const LeaderboardAPI = {
+  get: (game = 'ALL', period: 'WEEKLY' | 'ALL_TIME' = 'WEEKLY', limit = 50) =>
+    api.get(`/leaderboard?game=${game}&period=${period}&limit=${limit}`).then(r => r.data),
+  stats: (username: string) => api.get(`/stats/${username}`).then(r => r.data),
+};
+
 export const Phase10API = {
   createRoom: (data: { maxPlayers?: number; turnTimerSeconds?: number; botsEnabled?: boolean }) =>
     api.post('/phase10/create-room', data).then(res => res.data),
