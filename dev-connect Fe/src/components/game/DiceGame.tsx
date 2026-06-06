@@ -6,6 +6,7 @@ import { getAvatarEmoji } from '../../utils/avatars';
 import { GameInviteButton } from './GameInviteButton';
 import { HowToPlay } from './HowToPlay';
 import { Dice3D, DICE_ROLL_MS, DICE_STAGGER } from './Dice3D';
+import { useVisiblePolling } from '../../utils/usePolling';
 
 type Phase = 'lobby' | 'waiting' | 'playing' | 'gameover';
 type DiceGameType = 'PIG' | 'FARKLE' | 'LIARS_DICE' | 'SHIP_CAPTAIN_CREW';
@@ -97,11 +98,13 @@ export const DiceGame = ({ currentUser, onBack, gameType, initialRoomId }: DiceG
     } catch (err: any) { showError(err?.response?.data?.message || 'Failed to get room'); }
   };
 
-  useEffect(() => {
-    if (!roomId || phase === 'lobby' || phase === 'gameover') return;
-    const interval = setInterval(() => { if (!rollingRef.current) refreshState(roomId); }, 2000);
-    return () => clearInterval(interval);
-  }, [roomId, phase]);
+  // Server-state poll — paused while a die is mid-throw (rollingRef) and while
+  // the tab is in the background.
+  useVisiblePolling(
+    () => { if (!rollingRef.current) refreshState(roomId); },
+    2000,
+    !!roomId && phase !== 'lobby' && phase !== 'gameover',
+  );
 
   const handleCreate = async () => {
     setIsCreating(true); setError('');

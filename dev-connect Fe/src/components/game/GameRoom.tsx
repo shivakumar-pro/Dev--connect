@@ -1,16 +1,26 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import {
   Gamepad2, Trophy, Users, Crown, Target, Zap, Sparkles, Eye, Lightbulb,
-  HelpCircle, Brain, Hash, Dices, ArrowRight, FlaskConical, Castle, Skull,
+  HelpCircle, Brain, Hash, Dices, ArrowRight, FlaskConical, Castle, Skull, Loader2,
 } from 'lucide-react';
-import { GuessTheNumber } from './GuessTheNumber';
-import { PartyRoom } from './PartyRoom';
-import { DiceGame } from './DiceGame';
-import { Phase10 } from './Phase10';
-import { BottleShuffle } from './BottleShuffle';
-import { ChowkaBara } from './ChowkaBara';
-import { ToxicBite } from './ToxicBite';
 import { isGameHidden } from '../../utils/hiddenGames';
+
+// Code-split each game so the heavy animation/STOMP bundles never load until
+// the user actually picks one. Cuts the initial Dashboard chunk significantly.
+const GuessTheNumber = lazy(() => import('./GuessTheNumber').then(m => ({ default: m.GuessTheNumber })));
+const PartyRoom      = lazy(() => import('./PartyRoom').then(m => ({ default: m.PartyRoom })));
+const DiceGame       = lazy(() => import('./DiceGame').then(m => ({ default: m.DiceGame })));
+const Phase10        = lazy(() => import('./Phase10').then(m => ({ default: m.Phase10 })));
+const BottleShuffle  = lazy(() => import('./BottleShuffle').then(m => ({ default: m.BottleShuffle })));
+const ChowkaBara     = lazy(() => import('./ChowkaBara').then(m => ({ default: m.ChowkaBara })));
+const ToxicBite      = lazy(() => import('./ToxicBite').then(m => ({ default: m.ToxicBite })));
+
+const GameLoader = () => (
+  <div className="flex flex-col items-center justify-center h-full w-full bg-bg-primary gap-3 text-text-muted">
+    <Loader2 className="w-8 h-8 animate-spin text-accent-orange" />
+    <span className="text-sm">Loading game…</span>
+  </div>
+);
 
 // Proper "playing cards" glyph for Phase 10 (two fanned cards with a 10 pip).
 const Phase10Icon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -221,10 +231,39 @@ export interface GameJoinInvite {
   partyKey?: string;
 }
 
-export const GameRoom = ({ currentUser, joinInvite, onInviteConsumed }: { currentUser: any; joinInvite?: GameJoinInvite | null; onInviteConsumed?: () => void }) => {
+export const GameRoom = ({
+  currentUser,
+  joinInvite,
+  onInviteConsumed,
+  launchGameId,
+  onLaunchConsumed,
+}: {
+  currentUser: any;
+  joinInvite?: GameJoinInvite | null;
+  onInviteConsumed?: () => void;
+  /** When set, GameRoom auto-opens this game (used by Home's "Most Played" tiles). */
+  launchGameId?: string | null;
+  onLaunchConsumed?: () => void;
+}) => {
   const [activeGame, setActiveGame] = useState<string | null>(null);
   const [activePartyKey, setActivePartyKey] = useState<string | undefined>(undefined);
   const [inviteRoomId, setInviteRoomId] = useState<string | undefined>(undefined);
+
+  // Deep-link entry from Home: open the requested game directly. Dice keys & the
+  // party-game IDs need translating; standalone IDs pass straight through.
+  useEffect(() => {
+    if (!launchGameId) return;
+    const card = CATEGORIES.flatMap(c => c.games).find(g => g.id === launchGameId);
+    if (!card) { onLaunchConsumed?.(); return; }
+    if (card.type === 'party' && card.partyKey) {
+      setActivePartyKey(card.partyKey);
+      setActiveGame('party');
+    } else if (card.type === 'standalone') {
+      setActiveGame(card.id);
+    }
+    onLaunchConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [launchGameId]);
 
   // Route an incoming chat invite into the correct game and auto-join its room.
   useEffect(() => {
@@ -250,26 +289,28 @@ export const GameRoom = ({ currentUser, joinInvite, onInviteConsumed }: { curren
 
   const exitGame = () => { setActiveGame(null); setInviteRoomId(undefined); };
 
+  const wrap = (node: React.ReactNode) => <Suspense fallback={<GameLoader />}>{node}</Suspense>;
+
   if (activeGame === 'guess_1v1') {
-    return <GuessTheNumber currentUser={currentUser} onBack={exitGame} initialRoomId={inviteRoomId} />;
+    return wrap(<GuessTheNumber currentUser={currentUser} onBack={exitGame} initialRoomId={inviteRoomId} />);
   }
   if (activeGame === 'phase10') {
-    return <Phase10 currentUser={currentUser} onBack={exitGame} initialRoomId={inviteRoomId} />;
+    return wrap(<Phase10 currentUser={currentUser} onBack={exitGame} initialRoomId={inviteRoomId} />);
   }
   if (activeGame === 'bottle_shuffle') {
-    return <BottleShuffle currentUser={currentUser} onBack={exitGame} />;
+    return wrap(<BottleShuffle currentUser={currentUser} onBack={exitGame} />);
   }
   if (activeGame === 'chowka_bara') {
-    return <ChowkaBara currentUser={currentUser} onBack={exitGame} initialRoomId={inviteRoomId} />;
+    return wrap(<ChowkaBara currentUser={currentUser} onBack={exitGame} initialRoomId={inviteRoomId} />);
   }
   if (activeGame === 'toxic_bite') {
-    return <ToxicBite currentUser={currentUser} onBack={exitGame} initialRoomId={inviteRoomId} />;
+    return wrap(<ToxicBite currentUser={currentUser} onBack={exitGame} initialRoomId={inviteRoomId} />);
   }
   if (activeGame === 'party') {
-    return <PartyRoom currentUser={currentUser} onBack={exitGame} initialGameType={activePartyKey} initialRoomId={inviteRoomId} />;
+    return wrap(<PartyRoom currentUser={currentUser} onBack={exitGame} initialGameType={activePartyKey} initialRoomId={inviteRoomId} />);
   }
   if (activeGame && DICE_MAP[activeGame]) {
-    return <DiceGame currentUser={currentUser} onBack={exitGame} gameType={DICE_MAP[activeGame]} initialRoomId={inviteRoomId} />;
+    return wrap(<DiceGame currentUser={currentUser} onBack={exitGame} gameType={DICE_MAP[activeGame]} initialRoomId={inviteRoomId} />);
   }
 
   const handlePlay = (game: GameCard) => {
@@ -284,9 +325,24 @@ export const GameRoom = ({ currentUser, joinInvite, onInviteConsumed }: { curren
 
   // Hide games flagged in src/utils/hiddenGames.ts and drop categories that
   // end up empty after filtering.
+  // Push 3 specific categories to the bottom (per user preference):
+  //   3rd-last: Board Games (Chowka Bara)
+  //   2nd-last: Quiz & Speed   (This or That)
+  //   LAST    : Card Games     (Phase 10)
+  const BOTTOM_ORDER = ['Board Games', 'Quiz & Speed', 'Card Games'];
   const visibleCategories = CATEGORIES
     .map(c => ({ ...c, games: c.games.filter(g => !isGameHidden(g.id)) }))
-    .filter(c => c.games.length > 0);
+    .filter(c => c.games.length > 0)
+    .sort((a, b) => {
+      const ai = BOTTOM_ORDER.indexOf(a.title);
+      const bi = BOTTOM_ORDER.indexOf(b.title);
+      // Non-bottom categories keep their original order; bottom ones go to the
+      // end in the BOTTOM_ORDER sequence.
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return -1;
+      if (bi === -1) return 1;
+      return ai - bi;
+    });
   const totalGames = visibleCategories.reduce((sum, c) => sum + c.games.length, 0);
 
   return (

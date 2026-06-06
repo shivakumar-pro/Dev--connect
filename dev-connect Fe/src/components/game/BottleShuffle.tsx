@@ -14,6 +14,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { BottleAPI } from '../../services/api';
 import { HowToPlay } from './HowToPlay';
+import { useVisiblePolling } from '../../utils/usePolling';
 
 // ── Bottle palette ──
 interface BottleDef { key: string; label: string; body: string; cap: string; emoji: string }
@@ -171,13 +172,9 @@ export const BottleShuffle = ({ currentUser, onBack, initialRoomId }: { currentU
     } catch (err: any) { showError(err?.response?.data?.message || 'Failed to refresh room'); }
   }, [username, applyState]);
 
-  useEffect(() => {
-    // Keep polling in every joined phase (incl. 'finished') so a host rematch
-    // propagates to the other players.
-    if (!roomId || phase === 'lobby') return;
-    const iv = setInterval(() => refresh(roomId), 1500);
-    return () => clearInterval(iv);
-  }, [roomId, phase, refresh]);
+  // Polls every 1.5s while joined (incl. 'finished' so a host rematch propagates),
+  // but pauses when the tab is hidden — big CPU/network saver.
+  useVisiblePolling(() => refresh(roomId), 1500, !!roomId && phase !== 'lobby');
 
   // ── Room lifecycle ──
   const handleCreate = async () => {

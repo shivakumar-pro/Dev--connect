@@ -58,6 +58,20 @@ public class LeaderboardService {
         return out;
     }
 
+    /** Top {@code limit} game keys by total plays across all users. */
+    public List<Map<String, Object>> popularGames(int limit) {
+        int cap = Math.max(1, Math.min(limit, 20));
+        List<GameResultRepository.PopularRow> rows = repo.popularGames(PageRequest.of(0, cap));
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (GameResultRepository.PopularRow r : rows) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("gameKey", r.getGameKey());
+            m.put("played", r.getPlayed());
+            out.add(m);
+        }
+        return out;
+    }
+
     /** Per-user stats: per-game rollup, overall totals, and current win streak. */
     public Map<String, Object> userStats(String username) {
         List<GameResultRepository.StatRow> rows = repo.statsByUser(username);

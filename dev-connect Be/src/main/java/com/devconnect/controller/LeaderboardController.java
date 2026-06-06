@@ -37,4 +37,11 @@ public class LeaderboardController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> stats(@PathVariable String username) {
         return ResponseEntity.ok(ApiResponse.success("Stats", service.userStats(username)));
     }
+
+    /** Top games by total play count — powers the Home page "Most Played" tiles. */
+    @GetMapping("/leaderboard/popular")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> popular(
+            @RequestParam(defaultValue = "3") int limit) {
+        return ResponseEntity.ok(ApiResponse.success("Popular games", service.popularGames(limit)));
+    }
 }

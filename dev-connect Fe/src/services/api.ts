@@ -113,6 +113,8 @@ export const LeaderboardAPI = {
   get: (game = 'ALL', period: 'WEEKLY' | 'ALL_TIME' = 'WEEKLY', limit = 50) =>
     api.get(`/leaderboard?game=${game}&period=${period}&limit=${limit}`).then(r => r.data),
   stats: (username: string) => api.get(`/stats/${username}`).then(r => r.data),
+  /** Top-N games by total plays across all users. */
+  popular: (limit = 3) => api.get(`/leaderboard/popular?limit=${limit}`).then(r => r.data),
 };
 
 export const Phase10API = {

@@ -1,13 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GlobalChat } from '../components/chat/GlobalChat';
-import { PrivateChat } from '../components/chat/PrivateChat';
-import { GroupChat } from '../components/chat/GroupChat';
-import { GameRoom, type GameJoinInvite } from '../components/game/GameRoom';
+import { Home } from '../components/dashboard/Home';
 import { CallOverlay } from '../components/call/CallOverlay';
 import { ProfileEditor } from '../components/profile/ProfileEditor';
-import { Home } from '../components/dashboard/Home';
-import { Leaderboard } from '../components/leaderboard/Leaderboard';
+import type { GameJoinInvite } from '../components/game/GameRoom';
+
+// Lazy-load the heavy tabs. Initial paint only ships Home + chrome; chats,
+// games, and the leaderboard download on demand.
+const GlobalChat  = lazy(() => import('../components/chat/GlobalChat').then(m => ({ default: m.GlobalChat })));
+const PrivateChat = lazy(() => import('../components/chat/PrivateChat').then(m => ({ default: m.PrivateChat })));
+const GroupChat   = lazy(() => import('../components/chat/GroupChat').then(m => ({ default: m.GroupChat })));
+const GameRoom    = lazy(() => import('../components/game/GameRoom').then(m => ({ default: m.GameRoom })));
+const Leaderboard = lazy(() => import('../components/leaderboard/Leaderboard').then(m => ({ default: m.Leaderboard })));
+
+const TabFallback = () => (
+  <div className="flex items-center justify-center h-full w-full bg-bg-primary text-text-muted text-sm">
+    Loading…
+  </div>
+);
 import {
   LogOut, MessageCircle, Gamepad2, Film, BookOpen, Settings,
   ChevronRight, Globe, Lock, Users, Flame, MonitorPlay, Star, User,
@@ -110,6 +120,9 @@ export const Dashboard = () => {
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [incomingInvite, setIncomingInvite] = useState<{ payload: GameInvitePayload; fromName: string; fromAvatar?: string } | null>(null);
   const [gameJoinInvite, setGameJoinInvite] = useState<GameJoinInvite | null>(null);
+  // When Home's "Most Played" tiles deep-link into a specific game, we stash the
+  // GameRoom card id here and let GameRoom auto-launch on its next render.
+  const [pendingGameLaunch, setPendingGameLaunch] = useState<string | null>(null);
 
   const routeToGameInvite = (payload: GameInvitePayload) => {
     setGameJoinInvite({ kind: payload.kind, roomId: payload.roomId, diceType: payload.diceType, partyKey: payload.partyKey });
@@ -386,12 +399,38 @@ export const Dashboard = () => {
 
         {/* Content */}
         <div className="flex-1 flex min-h-0">
-          {activeTab === 'home' && <Home currentUser={currentUser} onNavigate={(tab, child) => { setActiveTab(tab); if (child) { setActiveChild(child); setExpandedTab(tab); } else { setExpandedTab(null); } }} />}
-          {activeTab === 'leaderboard' && <Leaderboard currentUser={currentUser} />}
-          {activeTab === 'chat' && activeChild === 'global' && <GlobalChat currentUser={currentUser} unreadCounts={unreadCounts} onMarkRead={markChatAsRead} />}
-          {activeTab === 'chat' && activeChild === 'private' && <PrivateChat currentUser={currentUser} unreadCounts={unreadCounts} onMarkRead={markChatAsRead} onJoinGameInvite={routeToGameInvite} />}
-          {activeTab === 'chat' && activeChild === 'group' && <GroupChat currentUser={currentUser} unreadCounts={unreadCounts} onMarkRead={markChatAsRead} />}
-          {activeTab === 'gameroom' && <GameRoom currentUser={currentUser} joinInvite={gameJoinInvite} onInviteConsumed={() => setGameJoinInvite(null)} />}
+          {activeTab === 'home' && (
+            <Home
+              currentUser={currentUser}
+              onNavigate={(tab, child) => {
+                // Home's "Most Played" tiles pass the GameRoom card id via the
+                // child arg when navigating to 'gameroom' — route it accordingly.
+                if (tab === 'gameroom' && child) {
+                  setPendingGameLaunch(child);
+                  setActiveTab('gameroom');
+                  setExpandedTab(null);
+                  return;
+                }
+                setActiveTab(tab);
+                if (child) { setActiveChild(child); setExpandedTab(tab); } else { setExpandedTab(null); }
+              }}
+            />
+          )}
+          {activeTab === 'leaderboard' && <Suspense fallback={<TabFallback />}><Leaderboard currentUser={currentUser} /></Suspense>}
+          {activeTab === 'chat' && activeChild === 'global' && <Suspense fallback={<TabFallback />}><GlobalChat currentUser={currentUser} unreadCounts={unreadCounts} onMarkRead={markChatAsRead} /></Suspense>}
+          {activeTab === 'chat' && activeChild === 'private' && <Suspense fallback={<TabFallback />}><PrivateChat currentUser={currentUser} unreadCounts={unreadCounts} onMarkRead={markChatAsRead} onJoinGameInvite={routeToGameInvite} /></Suspense>}
+          {activeTab === 'chat' && activeChild === 'group' && <Suspense fallback={<TabFallback />}><GroupChat currentUser={currentUser} unreadCounts={unreadCounts} onMarkRead={markChatAsRead} /></Suspense>}
+          {activeTab === 'gameroom' && (
+            <Suspense fallback={<TabFallback />}>
+              <GameRoom
+                currentUser={currentUser}
+                joinInvite={gameJoinInvite}
+                onInviteConsumed={() => setGameJoinInvite(null)}
+                launchGameId={pendingGameLaunch}
+                onLaunchConsumed={() => setPendingGameLaunch(null)}
+              />
+            </Suspense>
+          )}
         </div>
       </main>
 

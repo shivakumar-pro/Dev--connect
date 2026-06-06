@@ -9,6 +9,7 @@ import { ToxicAPI } from '../../services/api';
 import { getAvatarEmoji } from '../../utils/avatars';
 import { GameInviteButton } from './GameInviteButton';
 import { HowToPlay } from './HowToPlay';
+import { useVisiblePolling } from '../../utils/usePolling';
 
 type Phase = 'lobby' | 'waiting' | 'playing' | 'gameover';
 
@@ -156,12 +157,9 @@ export const ToxicBite = ({ currentUser, onBack, initialRoomId }: Props) => {
     }
   };
 
-  useEffect(() => {
-    if (!roomId || phase === 'lobby' || phase === 'gameover') return;
-    const interval = setInterval(() => refreshState(roomId), 1800);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomId, phase]);
+  // Paused when the tab is hidden — keeps battery & network quiet when the
+  // player tabs away mid-match.
+  useVisiblePolling(() => refreshState(roomId), 1800, !!roomId && phase !== 'lobby' && phase !== 'gameover');
 
   // ── Lobby actions ──
   const handleCreate = async () => {

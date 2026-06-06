@@ -46,4 +46,16 @@ public interface GameResultRepository extends JpaRepository<GameResult, Long> {
 
     /** Recent results for a user (newest first) — used to compute the current win streak. */
     List<GameResult> findTop20ByUsernameOrderByPlayedAtDesc(String username);
+
+    /** {gameKey, totalPlays} sorted by plays desc — the "most played" board. */
+    interface PopularRow {
+        String getGameKey();
+        long getPlayed();
+    }
+
+    @Query("SELECT r.gameKey AS gameKey, COUNT(r) AS played " +
+           "FROM GameResult r " +
+           "GROUP BY r.gameKey " +
+           "ORDER BY played DESC")
+    List<PopularRow> popularGames(Pageable pageable);
 }
